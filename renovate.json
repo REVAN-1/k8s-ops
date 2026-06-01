@@ -1,0 +1,72 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices"
+  ],
+
+  "flux": {
+    "managerFilePatterns": [
+      "/^clusters\\/talos-pve\\/.*\\.ya?ml$/"
+    ]
+  },
+
+  "kubernetes": {
+    "managerFilePatterns": [
+      "/^clusters\\/talos-pve\\/.*\\.ya?ml$/"
+    ]
+  },
+
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "talhelper talosVersion",
+      "managerFilePatterns": [
+        "/^talhelper\\/talconfig\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "talosVersion:\\s*\"?(?<currentValue>v?[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "siderolabs/talos"
+    },
+    {
+      "customType": "regex",
+      "description": "talhelper kubernetesVersion",
+      "managerFilePatterns": [
+        "/^talhelper\\/talconfig\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "kubernetesVersion:\\s*\"?(?<currentValue>v?[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "kubernetes/kubernetes"
+    },
+    {
+      "customType": "regex",
+      "description": "FluxInstance distribution version",
+      "managerFilePatterns": [
+        "/^clusters\\/talos-pve\\/flux-system\\/flux-instance\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "distribution:\\s*[\\s\\S]*?version:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "fluxcd/flux2"
+    }
+  ],
+
+  "packageRules": [
+    {
+      "description": "Automerge safe Flux Helm chart updates for Prometheus stack",
+      "matchManagers": ["flux"],
+      "matchPackageNames": [
+        "kube-prometheus-stack",
+        "prometheus"
+      ],
+      "matchUpdateTypes": ["minor", "patch"],
+      "minimumReleaseAge": "3 days",
+      "automerge": true,
+      "platformAutomerge": true
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumloadbalancerippool_v2.json
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: pool
+spec:
+  allowFirstLastIPs: "No"
+  blocks:
+    - cidr: 10.50.1.0/24
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumbgpadvertisement_v2.json
+apiVersion: cilium.io/v2
+kind: CiliumBGPAdvertisement
+metadata:
+  name: l3-bgp-advertisement
+  labels:
+    advertise: bgp
+spec:
+  advertisements:
+    - advertisementType: Service
+      service:
+        addresses:
+          - LoadBalancerIP
+      selector:
+        matchExpressions:
+          - {key: somekey, operator: NotIn, values: ["never-used-value"]}
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumbgppeerconfig_v2.json
+apiVersion: cilium.io/v2
+kind: CiliumBGPPeerConfig
+metadata:
+  name: l3-bgp-peer-config
+spec:
+  timers:
+    connectRetryTimeSeconds: 5
+    holdTimeSeconds: 9
+    keepAliveTimeSeconds: 3
+  gracefulRestart:
+    enabled: true
+    restartTimeSeconds: 15
+  families:
+    - afi: ipv4
+      safi: unicast
+      advertisements:
+        matchLabels:
+          advertise: bgp
+---
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumbgpclusterconfig_v2.json
+apiVersion: cilium.io/v2
+kind: CiliumBGPClusterConfig
+metadata:
+  name: l3-bgp-cluster-config
+spec:
+  nodeSelector:
+    matchExpressions:
+      - key: kubernetes.io/os
+        operator: In
+        values: ["linux"]
+  bgpInstances:
+    - name: cilium
+      localASN: 65000
+      peers:
+        - name: vyos
+          peerASN: 65000
+          peerAddress: 10.50.0.5
+          peerConfigRef:
+            name: l3-bgp-peer-config
+        - name: lb1
+          peerASN: 65000
+          peerAddress: 10.50.0.15
+          peerConfigRef:
+            name: l3-bgp-peer-config

@@ -1,0 +1,84 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kiwix
+  namespace: archiv
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      kiwix:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          app: 
+            image:
+              repository: ghcr.io/kiwix/kiwix-serve
+              tag: "latest"
+            env:
+              TZ: Europe/Berlin
+            args:
+              - "/data/*.zim"
+
+
+    service:
+      app:
+        controller: kiwix
+        ports:
+          http:
+            port: 8080
+
+    persistence:
+      data:
+        existingClaim: kiwix-data
+        advancedMounts:
+          kiwix:
+            app:
+              - path: /data            
+
+    ingress:
+      app:
+        className: "cilium"
+        hosts:
+          - host: "kiwix.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts:
+              - "kiwix.k8s.exmaple.com"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kiwix-data
+  namespace: archiv
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: csi-cephfs-sc
+  resources:
+    requests:
+      storage: 300Gi 

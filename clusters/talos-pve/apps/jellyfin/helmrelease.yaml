@@ -1,0 +1,89 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: jellyfin
+  namespace: jellyfin
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: jellyfin
+      version: 3.2.0
+      interval: 30m
+      sourceRef:
+        kind: HelmRepository
+        name: jellyfin
+        namespace: flux-system
+  values:
+    image:
+      repository: ghcr.io/jellyfin/jellyfin
+      tag: "10.11.10@sha256:6497f0245de93fac642926c065b427362ca5e626e659f690516599c8c3817a38"
+    ingress:
+      enabled: true
+      className: cilium
+      hosts:
+        - host: media.exmaple.com
+          paths:
+            - path: /
+              pathType: Prefix
+      tls:
+        - secretName: external-tls
+          hosts:
+            - media.exmaple.com
+
+    resources: 
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+        gpu.intel.com/i915: "1"
+      requests:
+        cpu: 100m
+        memory: 128Mi  
+
+    jellyfin:
+      enableDLNA: false 
+
+    persistence:
+      config:
+        enabled: true
+        accessMode: ReadWriteOnce
+        size: 30Gi
+        storageClass: 'csi-rbd-sc'
+      cache:
+        enabled: false
+      media:
+        enabled: false
+
+    volumes:
+      - name: jellyfin-video
+        persistentVolumeClaim:
+          claimName: jellyfin-video
+      - name: jellyfin-music
+        persistentVolumeClaim:
+          claimName: jellyfin-music
+      - name: jellyfin-cache
+        persistentVolumeClaim:
+          claimName: jellyfin-cache
+#      - name: jellyfin-meta
+#        persistentVolumeClaim:
+#          claimName: jellyfin-meta
+
+    volumeMounts:
+      - name: jellyfin-video
+        mountPath: /data2/video
+      - name: jellyfin-music
+        mountPath: /data2/music
+      - name: jellyfin-cache
+        mountPath: /cache
+#      - name: jellyfin-meta
+#        mountPath: /data2/jellyfin
+

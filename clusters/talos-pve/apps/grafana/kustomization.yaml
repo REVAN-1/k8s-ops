@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - backup.yaml
+  - loki_helm.yaml
+  - alloy.yaml
+  - grafana.yaml
+  - influxdb1.yaml
+  - influxdb2.yaml
+  - influxdb3.yaml
+  - secrets.yaml
+  - mktxp.yaml
+  - prometheus.yaml

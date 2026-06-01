@@ -1,0 +1,106 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: vaultwarden-db
+  namespace: vaultwarden
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  instances: 3
+  stopDelay: 30
+  smartShutdownTimeout: 180
+  enablePDB: false
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: restart
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+  managed:
+    services:
+      disabledDefaultServices: ["ro", "r"]
+    roles:
+      - name: vaultwarden
+        superuser: true
+        login: true
+        passwordSecret:
+          name: vaultwarden-db-secret
+  postgresql:
+    synchronous:
+      method: any
+      number: 1          
+    parameters:
+      max_connections: "200"
+  bootstrap:
+    initdb:
+      database: vaultwarden
+      owner: vaultwarden
+      secret:
+        name: vaultwarden-db-secret
+  storage:
+    size: 2Gi
+    storageClass: csi-rbd-sc
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: garage
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: backup-vaultwarden-postgresql
+  namespace: vaultwarden
+spec:
+  schedule: "0 0 18 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: vaultwarden-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: garage
+  namespace: vaultwarden
+spec:
+  configuration:
+    destinationPath: s3://k8s-postgresql/
+    endpointURL: https://s3.int.exmaple.com
+    s3Credentials:
+      accessKeyId:
+        name: garage-creds
+        key: access-key-id
+      secretAccessKey:
+        name: garage-creds
+        key: secret-access-key
+      region:
+        name: garage-creds
+        key: region
+    wal:
+      compression: gzip
+      maxParallel: 8
+  retentionPolicy: 30d
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: vaultwarden-db
+  namespace: vaultwarden
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - vaultwarden
+  selector:
+    matchLabels:
+      cnpg.io/cluster: vaultwarden-db
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

@@ -1,0 +1,201 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: immich
+  namespace: immich
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: immich
+      sourceRef:
+        kind: HelmRepository
+        name: immich
+        namespace: flux-system
+      version: "0.12.0"
+  valuesFrom:
+    - kind: Secret
+      name: immich-postgresql
+      valuesKey: password
+      targetPath: controllers.main.containers.main.env.DB_PASSWORD
+  values:
+
+    controllers:
+      main:
+        containers:
+          main:
+            image:
+              tag: v2.7.5
+            env:
+              DB_HOSTNAME: "immich-postgresql-rw"
+              DB_USERNAME: "immich"
+              DB_DATABASE_NAME: "immich"
+
+
+    immich:
+      metrics:
+        enabled: false
+      persistence:
+        library:
+          existingClaim: immich-data
+
+    valkey:
+      enabled: true
+      persistence:
+        data:
+          enabled: false
+
+    server:
+      enabled: true
+      controllers:
+        main:
+          containers:
+            main:
+              resources:
+                requests:
+                  cpu: "250m"
+                  memory: "512Mi"
+                limits:
+                  cpu: "1"
+                  memory: "1Gi"
+                  gpu.intel.com/i915: "1"
+      ingress:
+        main:
+          enabled: false
+
+    machine-learning:    
+      enabled: true
+      controllers:
+        main:
+          containers:
+            main:
+              image:
+                repository: ghcr.io/immich-app/immich-machine-learning
+                tag: v2.7.5
+              env:
+                TRANSFORMERS_CACHE: /cache
+                HF_XET_CACHE: /cache/huggingface-xet
+                MPLCONFIGDIR: /cache/matplotlib-config
+                MACHINE_LEARNING_MODEL_TTL: 0
+                MACHINE_LEARNING_CACHE_FOLDER: /cache
+              resources:  
+                requests:
+                  cpu: "250m"
+                  memory: "512Mi"
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+                  gpu.intel.com/i915: "1"
+              probes:
+                liveness:
+                  enabled: true
+                  custom: true
+                  spec:
+                    httpGet:
+                      path: /ping
+                      port: http
+                    initialDelaySeconds: 60
+                    periodSeconds: 30
+                    timeoutSeconds: 10
+                    failureThreshold: 40
+                readiness:
+                  enabled: true
+                  custom: true
+                  spec:
+                    httpGet:
+                      path: /ping
+                      port: http
+                    initialDelaySeconds: 0
+                    periodSeconds: 10
+                    timeoutSeconds: 5
+                    failureThreshold: 6
+                startup:
+                  enabled: true
+                  custom: true
+                  spec:
+                    httpGet:
+                      path: /ping
+                      port: http
+                    initialDelaySeconds: 0
+                    periodSeconds: 10
+                    timeoutSeconds: 5
+                    failureThreshold: 90
+      persistence:
+        cache: 
+          enabled: true
+          size: 25Gi
+          accessMode: ReadWriteMany
+          storageClass: csi-cephfs-sc
+          type: persistentVolumeClaim
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: immich-server
+  namespace: immich
+spec:
+  minReplicas: 2
+  maxReplicas: 3
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 60
+  metrics:
+    - resource:
+        name: cpu
+        target:
+          averageUtilization: 50
+          type: Utilization
+      type: Resource
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: immich-server
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: immich-machine-learning
+  namespace: immich
+spec:
+  minReplicas: 1
+  maxReplicas: 2
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 60
+  metrics:
+    - resource:
+        name: cpu
+        target:
+          averageUtilization: 50
+          type: Utilization
+      type: Resource
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: immich-machine-learning
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-data
+  namespace: immich
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: csi-cephfs-sc
+  resources:
+    requests:
+      storage: 500Gi 

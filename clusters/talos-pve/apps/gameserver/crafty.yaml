@@ -1,0 +1,146 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: crafty
+  namespace: gameserver
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      crafty:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+        containers:
+          app: 
+            image:
+              repository: registry.gitlab.com/crafty-controller/crafty-4
+              tag: "4.10.4@sha256:d2f61fcabb4756a63bc8538fb4f5e35ffddca3f1916a733c95a31c705c697742"
+            env:
+              TZ: Europe/Berlin
+
+    service:
+      app:
+        controller: crafty 
+        ports:
+          https:
+            port: 8443
+            targetPort: 8443
+            protocol: TCP
+          dynmap:
+            port: 8123
+            targetPort: 8123
+            protocol: TCP
+          bedrock:
+            port: 19132
+            targetPort: 19132
+            protocol: UDP
+          java: 
+            port: 25565
+            targetPort: 25565
+            protocol: TCP
+          
+          
+    persistence:
+      storage:
+        enabled: true
+        type: persistentVolumeClaim
+        existingClaim: crafty-data
+        globalMounts:
+          - path: /crafty/backups
+            subPath: backups
+          - path: /crafty/logs
+            subPath: logs
+          - path: /crafty/servers
+            subPath: servers
+          - path: /crafty/app/config
+            subPath: config
+          - path: /crafty/import
+            subPath: import
+      tls: 
+        enabled: true
+        type: secret
+        name: default-tls
+        advancedMounts:
+          crafty:
+            app:
+              - path: /crafty/app/config/web/certs/commander.cert.pem
+                subPath: tls.crt     
+                readOnly: true
+              - path: /crafty/app/config/web/certs/commander.key.pem
+                subPath: tls.key      
+                readOnly: true
+
+    ingress:
+      app:
+        className: "cilium"
+        annotations:
+          ingress.cilium.io/tls-passthrough: "enabled"
+        hosts:
+          - host: "crafty.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: https
+        tls:
+          - hosts:
+              - "crafty.k8s.exmaple.com"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: crafty-data
+  namespace: gameserver
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: csi-cephfs-sc
+  resources:
+    requests:
+      storage: 20Gi 
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crafty-lb
+  namespace: gameserver
+  labels:
+    app: crafty
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 10.50.1.6
+  ports:
+  - port: 8123
+    targetPort: 8123
+    protocol: TCP
+    name: dynmap
+  - port: 19132
+    targetPort: 19132
+    protocol: UDP                                                                                                                                                                                                                                  
+    name: bedrock
+  - port: 25565
+    targetPort: 25565 
+    protocol: TCP
+    name: java                                                                    
+  selector:
+    app.kubernetes.io/name: crafty

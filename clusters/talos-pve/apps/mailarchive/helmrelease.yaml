@@ -1,0 +1,98 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mailarchive
+  namespace: mailarchive
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      mailarchive:
+        strategy: Recreate
+        containers:
+          mailarchive:
+            image:
+              repository: ghcr.io/s1t5/mailarchiver
+              tag: "2605.2@sha256:ea7fd8c2e3e0ef0941e8dd9e726e35a8de33296f5c7b9ed811df5168ae6a9714"
+            env:
+              MailSync__IntervalMinutes: "120"
+              MailSync__IgnoreSelfSignedCert: "false"
+              TimeZone__DisplayTimeZoneId: "Europe/Berlin"
+              AllowedHosts: "mailarchive.k8s.exmaple.com"
+              OAuth__Enabled: "true"
+              OAuth__Authority: "https://idm.exmaple.com/application/o/mailarchive/"
+              OAuth__ClientScopes__0: "openid"
+              OAuth__ClientScopes__1: "profile"
+              OAuth__ClientScopes__2: "email"
+              OAuth__DisablePasswordLogin: "false"
+              OAuth__AutoRedirect: "false"
+              OAuth__AutoApproveUsers: "true"
+              OAuth__AdminEmails__0: "admin@example.com"
+            envFrom:
+              - secretRef:
+                  name: mailarchive-env
+
+    service:
+      mailarchive:
+        controller: mailarchive
+        ports:
+          http:
+            port: 5000
+
+
+    persistence:
+      data:
+        enabled: true
+        type: persistentVolumeClaim
+        existingClaim: mailarchive-data
+        globalMounts:
+          - path: /app/logs
+            subPath: logs
+          - path: /app/DataProtection-Keys
+            subPath: data-protection-keys  
+
+    ingress:
+      mailarchive:
+        className: "cilium"
+        hosts:
+          - host: "mailarchive.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: mailarchive
+                  port: http
+        tls:
+          - hosts:
+              - "mailarchive.k8s.exmaple.com"   
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mailarchive-data
+  namespace: mailarchive
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 5Gi     

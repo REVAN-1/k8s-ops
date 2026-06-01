@@ -1,0 +1,94 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: authentik
+  namespace: authentik
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: authentik
+      sourceRef:
+        kind: HelmRepository
+        name: authentik
+        namespace: flux-system
+      version: "2026.5.2"
+  valuesFrom:
+    - kind: Secret
+      name: authentik-secrets
+      # zieht den kompletten YAML-Block aus .data["values.yaml"]
+      valuesKey: values.yaml
+  values:    
+    authentik:
+        email:
+          # -- SMTP Server emails are sent from, fully optional
+          host: "mail.exmaple.com"
+          # -- SMTP server port
+          port: 465
+          # -- SMTP credentials, when left empty, no authentication will be done
+          username: "idm@exmaple.com"
+          # -- Enable either use_tls or use_ssl, they can't be enabled at the same time.
+          use_tls: false
+          # -- Enable either use_tls or use_ssl, they can't be enabled at the same time.
+          use_ssl: true
+          # -- Connection timeout
+          timeout: 30
+          # -- Email from address, can either be in the format "foo@bar.baz" or "authentik <foo@bar.baz>"
+          from: "idm@exmaple.com"
+
+        # This sends anonymous usage-data, stack traces on errors and
+        # performance data to sentry.io, and is fully opt-in
+        error_reporting:
+            enabled: true
+        postgresql:
+          host: authentik-db-rw
+          name: "authentik"
+          user: "authentik"
+
+
+    server:
+      replicas: 2
+      autoscaling:
+        # -- Enable Horizontal Pod Autoscaler ([HPA]) for the authentik server
+        enabled: false
+      env:
+      - name: AUTHENTIK_DEFAULT_USER_CHANGE_EMAIL
+        value: "true"
+      - name: AUTHENTIK_DEFAULT_USER_CHANGE_NAME
+        value: "true"
+      - name: AUTHENTIK_DEFAULT_USER_CHANGE_USERNAME
+        value: "true"
+      ingress:
+          # Specify kubernetes ingress controller class name
+          ingressClassName: cilium
+          enabled: true
+          annotations:
+          hosts:
+            - idm.exmaple.com
+          pathType: Prefix
+          tls:
+            - secretName: external-tls
+              hosts:
+                - idm.exmaple.com
+
+    worker: 
+      replicas: 2
+
+    postgresql:
+        enabled: false
+
+    gepip:
+      enabled: true
+      existingSecret:
+        secretName: "geoip-creds"
+        accountId: "account_id"
+        licenseKey: "license_key"       

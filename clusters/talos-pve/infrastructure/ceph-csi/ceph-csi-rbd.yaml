@@ -1,0 +1,55 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ceph-csi-rbd
+  namespace: ceph-csi
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: ceph-csi-rbd
+      sourceRef:
+        kind: HelmRepository
+        name: ceph-csi
+        namespace: flux-system
+      version: "3.17.0"
+  values:
+    csiConfig:
+      - clusterID: "31095d64-7bff-11f0-8065-d9f210f0c539"
+        monitors: 
+        - "10.50.0.21:3300"
+        - "10.50.0.22:3300"
+        - "10.50.0.23:3300"
+        provisionerSecretName: "csi-rbd-secret"
+        provisionerSecretNamespace: "ceph-csi"
+        nodeStageSecretName: "csi-rbd-secret"
+        nodeStageSecretNamespace: "ceph-csi"
+    storageClass:
+      reclaimPolicy: "Delete"
+      imageFeatures: layering
+      allowVolumeExpansion: true
+      create: true
+      annotations:
+        storageclass.kubernetes.io/is-default-class: "true"
+      clusterID: "31095d64-7bff-11f0-8065-d9f210f0c539"
+      pool: "talos-rbd"
+      provisionerSecretName: "csi-rbd-secret"         
+      provisionerSecretNamespace: "ceph-csi"
+      nodeStageSecretName: "csi-rbd-secret"
+      nodeStageSecretNamespace: "ceph-csi"
+      tryOtherMounters: false
+      mounter: krbd
+    volumeSnapshotClass:
+      create: false
+    provisioner:
+      name: provisioner
+      replicaCount: 3

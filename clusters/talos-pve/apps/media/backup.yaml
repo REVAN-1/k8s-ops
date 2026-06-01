@@ -1,0 +1,181 @@
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-audiobookshelf
+  namespace: media
+spec:
+  sourcePVC: audiobookshelf-config
+  trigger:
+    schedule: "0 12 * * *"
+  restic:
+    pruneIntervalDays: 14
+    repository: restic-config-audiobookshelf
+    # Retention policy for backups
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheStorageClassName: csi-rbd-sc
+    moverSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      fsGroup: 0
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-jellyseerr
+  namespace: media
+spec:
+  sourcePVC: jellyseerr-config
+  trigger:
+    schedule: "0 12 * * *"
+  restic:
+    pruneIntervalDays: 14
+    repository: restic-config-jellyseerr
+    # Retention policy for backups
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheStorageClassName: csi-rbd-sc
+    moverSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      fsGroup: 0
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-kavita
+  namespace: media
+spec:
+  sourcePVC: kavita-config
+  trigger:
+    schedule: "0 12 * * *"
+  restic:
+    pruneIntervalDays: 14
+    repository: restic-config-kavita
+    # Retention policy for backups
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheStorageClassName: csi-rbd-sc
+    moverSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      fsGroup: 0
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-pinchflat
+  namespace: media
+spec:
+  sourcePVC: pinchflat-config
+  trigger:
+    schedule: "0 12 * * *"
+  restic:
+    pruneIntervalDays: 14
+    repository: restic-config-pinchflat
+    # Retention policy for backups
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheStorageClassName: csi-rbd-sc
+    moverSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      fsGroup: 0
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-lidarr
+  namespace: media
+spec:
+  sourcePVC: lidarr-config
+  trigger:
+    schedule: "0 12 * * *"
+  restic:
+    pruneIntervalDays: 14
+    repository: restic-config-lidarr
+    # Retention policy for backups
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheStorageClassName: csi-rbd-sc
+    moverSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      fsGroup: 0
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-sonarr
+  namespace: media
+spec:
+  sourcePVC: sonarr-config
+  trigger:
+    schedule: "0 13 * * *"
+  restic:
+    pruneIntervalDays: 14
+    repository: restic-config-sonarr
+    # Retention policy for backups
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheStorageClassName: csi-rbd-sc
+    moverSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      fsGroup: 0
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-radarr
+  namespace: media
+spec:
+  sourcePVC: radarr-config
+  trigger:
+    schedule: "0 13 * * *"
+  restic:
+    pruneIntervalDays: 14
+    repository: restic-config-radarr
+    # Retention policy for backups
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheStorageClassName: csi-rbd-sc
+    moverSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      fsGroup: 0

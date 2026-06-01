@@ -1,0 +1,169 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: phpipam
+  namespace: phpipam
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      phpipam:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          phpipam:
+            image:
+              repository: docker.io/phpipam/phpipam-www
+              tag: "1.8x"
+            env:
+              TZ: Europe/Berlin
+              IPAM_DATABASE_HOST: "phpipam-mariadb"
+              IPAM_DATABASE_PORT: "3306"
+              IPAM_DATABASE_USER: "phpipam"
+              IPAM_DATABASE_NAME: "phpipam"
+              IPAM_DATABASE_WEBHOST: "%"
+              IPAM_TRUST_X_FORWARDED: "true"
+              IPAM_DISABLE_INSTALLER: "false"
+            envFrom:
+              - secretRef:
+                  name: phpipam-env
+
+      cron:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          cron:
+            image:
+              repository: docker.io/phpipam/phpipam-cron
+              tag: "1.8x"
+            env:
+              TZ: Europe/Berlin
+              IPAM_DATABASE_HOST: "phpipam-mariadb"
+              IPAM_DATABASE_PORT: "3306"
+              IPAM_DATABASE_USER: "phpipam"
+              IPAM_DATABASE_NAME: "phpipam"
+              SCAN_INTERVAL: "1h"
+            envFrom:
+              - secretRef:
+                  name: phpipam-env
+
+
+      mariadb:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          mariadb:
+            image:
+              repository: docker.io/mariadb
+              tag: "11"
+            env:
+              TZ: Europe/Berlin
+              MARIADB_DATABASE: "phpipam"
+              MARIADB_USER: "phpipam"
+            envFrom:
+              - secretRef:
+                  name: phpipam-env
+
+    service:
+      phpipam:
+        controller: phpipam
+        ports:
+          http:
+            port: 80
+
+      mariadb:
+        controller: mariadb
+        ports:
+          mysql:
+            port: 3306
+
+    persistence:
+      data:
+        enabled: true
+        type: persistentVolumeClaim
+        existingClaim: phpipam-data
+        advancedMounts:
+          phpipam:
+            phpipam:
+              - path: /phpipam/css/images/logo
+                subPath: logo
+              - path: /usr/local/share/ca-certificates
+                subPath: ca-certificates
+                readOnly: true
+          cron:
+            cron:
+              - path: /usr/local/share/ca-certificates
+                subPath: ca-certificates
+                readOnly: true
+
+      mariadb-data:
+        enabled: true
+        type: persistentVolumeClaim
+        existingClaim: phpipam-mariadb-data
+        advancedMounts:
+          mariadb:
+            mariadb:
+              - path: /var/lib/mysql
+
+    ingress:
+      phpipam:
+        className: "cilium"
+        hosts:
+          - host: "phpipam.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: phpipam
+                  port: http
+        tls:
+          - hosts:
+              - "phpipam.k8s.exmaple.com"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: phpipam-data
+  namespace: phpipam
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: csi-cephfs-sc
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: phpipam-mariadb-data
+  namespace: phpipam
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 10Gi

@@ -1,0 +1,75 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: metube
+  namespace: downloader
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      metube:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          app: 
+            image:
+              repository: ghcr.io/alexta69/metube
+              tag: latest
+              pullPolicy: Always
+            env:
+              TZ: Europe/Berlin
+            resources:
+              requests:
+                cpu: "250m"     
+                memory: "128Mi"  
+              limits:
+                cpu: "1"     
+                memory: "2048Mi"  
+
+    service:
+      app:
+        controller: metube
+        ports:
+          http:
+            port: 8081
+
+    ingress:
+      app:
+        className: "cilium"
+        hosts:
+          - host: "metube.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts:
+              - "metube.k8s.exmaple.com"
+
+    persistence:
+      download:     
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/downloads/youtube
+        globalMounts:
+          - path: /downloads

@@ -1,0 +1,29 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: onlyoffice-db
+  namespace: nextcloud
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:13
+  instances: 1
+  stopDelay: 30
+  smartShutdownTimeout: 180
+  enablePDB: false
+  managed:
+    services:
+      disabledDefaultServices: ["ro", "r"]
+    roles:
+      - name: onlyoffice
+        superuser: true
+        login: true
+        passwordSecret:
+          name: onlyoffice-db-secret
+  bootstrap:
+    initdb:
+      database: onlyoffice
+      owner: onlyoffice
+      secret:
+        name: onlyoffice-db-secret
+  storage:
+    size: 1Gi
+    storageClass: csi-rbd-sc

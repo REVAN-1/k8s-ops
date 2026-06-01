@@ -1,0 +1,103 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: audiobookshelf
+  namespace: media
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      audiobookshelf:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          app: 
+            image:
+              repository: ghcr.io/advplyr/audiobookshelf
+              tag: "latest"
+            env:
+              TZ: Europe/Berlin
+
+    service:
+      app:
+        controller: audiobookshelf
+        ports:
+          http:
+            port: 80
+
+    persistence:
+      config:
+        existingClaim: audiobookshelf-config
+        advancedMounts:
+          audiobookshelf:
+            app:
+              - path: /config            
+
+      # Configure an NFS mount to store backups on
+      audiobooks:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/audio/audiobooks
+        globalMounts:
+          - path: /audiobooks
+
+      podcasts:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/audio/podcasts
+        globalMounts:
+          - path: /podcasts
+
+      metadata:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/audio/metadata
+        globalMounts:
+          - path: /metadata
+
+    ingress:
+      app:
+        className: "cilium"
+        hosts:
+          - host: "audiobookshelf.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts:
+              - "audiobookshelf.k8s.exmaple.com"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: audiobookshelf-config
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 200Mi 

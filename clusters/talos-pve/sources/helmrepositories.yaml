@@ -1,0 +1,286 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: bjw-s
+  namespace: flux-system
+spec:
+  interval: 6h0m0s
+  url: https://bjw-s-labs.github.io/helm-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: authentik
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url:  https://charts.goauthentik.io
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: ceph-csi
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://ceph.github.io/csi-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: jetstack
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://charts.jetstack.io
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: cloudnative-pg
+  namespace: flux-system
+spec:
+  url: https://cloudnative-pg.github.io/charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: crowdsec
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url:  https://crowdsecurity.github.io/helm-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: my-jdownloader
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://pmoscode-helm.github.io/jdownloader2/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: excalidraw
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://johanneskastl.github.io/excalidraw-helm-chart/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: influxdata
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://helm.influxdata.com/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: grafana
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://grafana.github.io/helm-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: headlamp
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://kubernetes-sigs.github.io/headlamp/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: homepage
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://jameswynn.github.io/helm-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: immich
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url:  https://immich-app.github.io/immich-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: intel
+  namespace: flux-system
+spec:
+  interval: 2h
+  url: https://intel.github.io/helm-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: node-feature-discovery
+  namespace: flux-system
+spec:
+  interval: 2h
+  url: https://kubernetes-sigs.github.io/node-feature-discovery/charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: jellyfin
+  namespace: flux-system
+spec:
+  interval: 2h
+  url: https://jellyfin.github.io/jellyfin-helm
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: ananace-charts
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://ananace.gitlab.io/charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: netbox
+  namespace: flux-system
+spec:
+  interval: "1h"
+  type: oci
+  url: oci://ghcr.io/netbox-community/netbox-chart
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: nextcloud
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url:  https://nextcloud.github.io/helm/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: prometheus
+  namespace: flux-system
+spec:
+  interval: "1h"
+  type: oci
+  url: oci://ghcr.io/prometheus-community/charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: emberstack
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://emberstack.github.io/helm-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: stakater
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://stakater.github.io/stakater-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: mariadb-operator
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: https://mariadb-operator.github.io/mariadb-operator
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: sinextra
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://helm-charts.sinextra.dev
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name:  vaultwarden
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url:  https://guerzon.github.io/vaultwarden
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: vikunja
+  namespace: flux-system
+spec:
+  interval: "1h"
+  type: oci
+  url: oci://ghcr.io/go-vikunja/helm-chart
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: backube-helm-charts
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url:  https://backube.github.io/helm-charts/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: woodpecker
+  namespace: flux-system
+spec:
+  interval: "1h"
+  type: oci
+  url: oci://ghcr.io/woodpecker-ci/helm/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: zabbix
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url:  https://zabbix-community.github.io/helm-zabbix
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: project-zot
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url:  http://zotregistry.dev/helm-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: volsync
+  namespace: volsync-system
+spec:
+  interval: 15m
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  ref:
+    tag: 0.18.5
+  url: oci://ghcr.io/home-operations/charts-mirror/volsync-perfectra1n

@@ -1,0 +1,94 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: mailarchive-db
+  namespace: mailarchive
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:14
+  instances: 1
+  stopDelay: 30
+  smartShutdownTimeout: 180
+  enablePDB: false
+  managed:
+    services:
+      disabledDefaultServices: ["ro", "r"]
+    roles:
+      - name: mailarchive
+        superuser: true
+        login: true
+        passwordSecret:
+          name: mailarchive-db-secret
+  bootstrap:
+    initdb:
+      database: mailarchive
+      owner: mailarchive
+      secret:
+        name: mailarchive-db-secret
+  storage:
+    size: 2Gi
+    storageClass: csi-rbd-sc
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: garage
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: backup-mailarchive-postgresql
+  namespace: mailarchive
+spec:
+  schedule: "0 0 18 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: mailarchive-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: garage
+  namespace: mailarchive
+spec:
+  configuration:
+    destinationPath: s3://k8s-postgresql/
+    endpointURL: https://s3.int.exmaple.com
+    s3Credentials:
+      accessKeyId:
+        name: garage-creds
+        key: access-key-id
+      secretAccessKey:
+        name: garage-creds
+        key: secret-access-key
+      region:
+        name: garage-creds
+        key: region
+    wal:
+      compression: gzip
+      maxParallel: 8
+  retentionPolicy: 30d
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: mailarchive-db
+  namespace: mailarchive
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - mailarchive
+  selector:
+    matchLabels:
+      cnpg.io/cluster: mailarchive-db
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

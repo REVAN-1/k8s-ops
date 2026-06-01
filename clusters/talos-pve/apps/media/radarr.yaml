@@ -1,0 +1,97 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: radarr
+  namespace: media
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      radarr:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          app: 
+            image:
+              repository: ghcr.io/hotio/radarr
+              tag: "latest"
+            env:
+              TZ: Europe/Berlin
+              PUID: 0
+              GUID: 0
+
+    service:
+      app:
+        controller: radarr
+        ports:
+          http:
+            port: 7878
+
+          
+    persistence:
+      config:
+        existingClaim: radarr-config
+        advancedMounts:
+          radarr:
+            app:
+              - path: /config  
+
+      data:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/video/filme
+        globalMounts:
+          - path: /data
+
+      download:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/downloads/sabnzb/filme
+        globalMounts:
+          - path: /filme
+
+    ingress:
+      app:
+        className: "cilium"
+        hosts:
+          - host: "radarr.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts:
+              - "radarr.k8s.exmaple.com"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: radarr-config
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 2Gi 

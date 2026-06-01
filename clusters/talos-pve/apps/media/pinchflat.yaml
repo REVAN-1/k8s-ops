@@ -1,0 +1,88 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pinchflat
+  namespace: media
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      pinchflat:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          app: 
+            image:
+              repository: ghcr.io/kieraneglin/pinchflat
+              tag: "latest"
+            env:
+              TZ: Europe/Berlin
+
+    service:
+      app:
+        controller: pinchflat
+        ports:
+          http:
+            port: 8945
+
+    persistence:
+      config:
+        existingClaim: pinchflat-config
+        advancedMounts:
+          pinchflat:
+            app:
+              - path: /config            
+
+
+      audiobooks:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/archiv/youtube
+        globalMounts:
+          - path: /downloads
+
+    ingress:
+      app:
+        className: "cilium"
+        hosts:
+          - host: "pinchflat.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts:
+              - "pinchflat.k8s.exmaple.com"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pinchflat-config
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 1Gi

@@ -1,0 +1,102 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gokapi
+  namespace: gokapi
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      gokapi:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          app: 
+            image:
+              repository: docker.io/f0rc3/gokapi
+              tag: "latest"
+            env:
+              TZ: Europe/Berlin
+
+    service:
+      app:
+        controller: gokapi
+        ports:
+          http:
+            port: 53842
+
+    persistence:
+      config:
+        existingClaim: gokapi-config
+        advancedMounts:
+          gokapi:
+            app:
+              - path: /app/config              
+
+      data:
+        existingClaim: gokapi-data
+        advancedMounts:
+          gokapi:
+            app:
+            - path: /app/data
+
+    ingress:
+      app:
+        className: "cilium"
+        hosts:
+          - host: "fileshare.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts:
+              - "fileshare.exmaple.com"
+            secretName: external-tls
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gokapi-config
+  namespace: gokapi
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 1Gi 
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gokapi-data
+  namespace: gokapi
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: csi-cephfs-sc
+  resources:
+    requests:
+      storage: 50Gi 

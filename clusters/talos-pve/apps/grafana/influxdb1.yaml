@@ -1,0 +1,43 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: influxdb-v1
+  namespace: grafana
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: influxdb
+      sourceRef:
+        kind: HelmRepository
+        name: influxdata
+        namespace: flux-system
+      version: "4.12.5"
+  values:
+    persistence:
+      enabled: true
+      storageClass: "csi-rbd-sc"
+      accessMode: ReadWriteOnce
+      size: 8Gi
+    setDefaultUser:
+      enabled: false
+      user:
+        existingSecret: influxdb-auth
+    ingress:
+      enabled: true
+      tls: false
+      hostname: influxdb-v1.k8s.exmaple.com
+      className: cilium
+    env:
+      - name: INFLUXDB_DB
+        value: "evcc"
+

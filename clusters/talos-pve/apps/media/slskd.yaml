@@ -1,0 +1,217 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: slskd
+  namespace: media
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      slskd:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          app: 
+            image:
+              repository: ghcr.io/slskd/slskd
+              tag: "0.25.1"
+            command:
+              - /bin/sh
+            args:
+              - -c
+              - |
+                set -eu
+
+                echo "[slskd] Waiting for Gluetun forwarded port..."
+                while [ ! -s /tmp/gluetun/forwarded_port ]; do
+                  sleep 5
+                done
+
+                PORT="$(tr -d '\r\n ' < /tmp/gluetun/forwarded_port)"
+                if [ -z "$PORT" ]; then
+                  echo "[slskd] Error: forwarded_port is empty"
+                  exit 1
+                fi
+                echo "[slskd] Got forwarded port: $PORT"
+
+                echo "[slskd] Updating listen_port in /config/slskd.yml"
+                if grep -q '^[[:space:]]*listen_port:' /config/slskd.yml; then
+                  sed -i "s/^\([[:space:]]*listen_port:[[:space:]]*\).*/\1${PORT}/" /config/slskd.yml
+                else
+                  echo "[slskd] Error: listen_port key not found in /config/slskd.yml"
+                  exit 1
+                fi
+
+                echo "[slskd] Starting slskd"
+                umask "${SLSKD_UMASK:-0022}"
+                exec ./slskd
+            env:
+              TZ: Europe/Berlin
+              DOTNET_BUNDLE_EXTRACT_BASE_DIR: /tmp/.net
+              SLSKD_APP_DIR: /config
+              SLSKD_NO_AUTH: true
+              SLSKD_NO_HTTPS: true
+              SLSKD_NO_VERSION_CHECK: true
+              SLSKD_SLSK_LISTEN_PORT: 50429   
+              SLSKD_REMOTE_CONFIGURATION: true
+            envFrom:
+              - secretRef:
+                  name: slskd-env
+            resources:
+              requests:
+                cpu: 100m
+              limits:
+                cpu: 200m
+                memory: 512Mi
+          gluetun:
+            image:
+              repository: ghcr.io/qdm12/gluetun
+              tag: v3.41
+            env:
+              VPN_SERVICE_PROVIDER: custom
+              VPN_TYPE: wireguard
+              VPN_ENDPOINT_PORT: 51820
+              VPN_PORT_FORWARDING: on
+              VPN_PORT_FORWARDING_PROVIDER: protonvpn
+              VPN_PORT_FORWARDING_STATUS_FILE: /tmp/gluetun/forwarded_port
+              HEALTH_ICMP_TARGET_IPS: "1.1.1.1"
+              WIREGUARD_MTU: 1280
+              DOT: off
+              FIREWALL_INPUT_PORTS: 5030
+              FIREWALL_OUTBOUND_SUBNETS: 10.10.10.0/24,10.50.0.0/23,10.244.0.0/16,192.168.178.0/24
+              WIREGUARD_PERSISTENT_KEEPALIVE_INTERVAL: 25s
+            envFrom:
+              - secretRef:
+                  name: slskd-secret                
+            probes:
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command: ["/gluetun-entrypoint", "healthcheck"]
+                  periodSeconds: 10
+                  failureThreshold: 30
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command: ["/gluetun-entrypoint", "healthcheck"]
+                  periodSeconds: 30
+                  timeoutSeconds: 10
+                  failureThreshold: 3
+            securityContext:
+              capabilities:
+                add:
+                  - NET_ADMIN
+              allowPrivilegeEscalation: false
+            resources:
+              requests:
+                cpu: 100m
+              limits:
+                cpu: 200m
+                memory: 512Mi
+
+    service:
+      app:
+        controller: slskd
+        ports:
+          http:
+            port: 5030
+
+          
+    persistence:
+      config:
+        existingClaim: slskd-config
+        advancedMounts:
+          slskd:
+            app:
+              - path: /config
+            portupdater:
+              - path: /config
+      download:
+        existingClaim: slskd-download
+        advancedMounts:
+          slskd:
+            app:
+              - path: /downloads
+            portupdater:
+              - path: /downloads
+
+      librarie:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/music
+        globalMounts:
+          - path: /librarie
+
+      gluetun-forwarded-port:
+        type: emptyDir
+        advancedMounts:
+          slskd:
+            app:
+              - path: /tmp/gluetun
+            gluetun:
+              - path: /tmp/gluetun
+            portupdater:
+              - path: /tmp/gluetun
+
+    ingress:
+      app:
+        className: "cilium"
+        hosts:
+          - host: "slskd.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts:
+              - "slskd.k8s.exmaple.com"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: slskd-config
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: slskd-download
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: csi-cephfs-sc
+  resources:
+    requests:
+      storage: 20Gi

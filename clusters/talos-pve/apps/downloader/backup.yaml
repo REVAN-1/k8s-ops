@@ -1,0 +1,25 @@
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-sabnzbd
+  namespace: downloader
+spec:
+  sourcePVC: sabnzbd-config
+  trigger:
+    schedule: "0 13 * * *"
+  restic:
+    pruneIntervalDays: 14
+    repository: restic-config-sabnzbd
+    # Retention policy for backups
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheStorageClassName: csi-rbd-sc
+    moverSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      fsGroup: 0

@@ -1,0 +1,99 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: lidarr
+  namespace: media
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      lidarr:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          app: 
+            image:
+              repository: ghcr.io/hotio/lidarr
+              tag: "pr-plugins"
+            env:
+              TZ: Europe/Berlin
+              PUID: 0
+              GUID: 0
+
+    service:
+      app:
+        controller: lidarr
+        ports:
+          http:
+            port: 8686
+
+          
+    persistence:
+      config:
+        existingClaim: lidarr-config
+        advancedMounts:
+          lidarr:
+            app:
+              - path: /config  
+
+      download:
+        existingClaim: slskd-download
+        advancedMounts:
+          lidarr:
+            app:
+              - path: /downloads
+            portupdater:
+              - path: /downloads
+
+      data:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/music
+        globalMounts:
+          - path: /data
+
+    ingress:
+      app:
+        className: "cilium"
+        hosts:
+          - host: "lidarr.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts:
+              - "lidarr.k8s.exmaple.com"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lidarr-config
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 2Gi 

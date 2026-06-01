@@ -1,0 +1,74 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: outline-db
+  namespace: outline
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+  instances: 1
+  stopDelay: 30
+  smartShutdownTimeout: 180
+  enablePDB: false
+  managed:
+    services:
+      disabledDefaultServices: ["ro", "r"]
+    roles:
+      - name: outline
+        superuser: true
+        login: true
+        passwordSecret:
+          name: outline-db-secret
+  bootstrap:
+    initdb:
+      database: outline
+      owner: outline
+      secret:
+        name: outline-db-secret
+  storage:
+    size: 2Gi
+    storageClass: csi-rbd-sc
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: garage
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: backup-outline-postgresql
+  namespace: outline
+spec:
+  schedule: "0 0 18 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: outline-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: garage
+  namespace: outline
+spec:
+  configuration:
+    destinationPath: s3://k8s-postgresql/
+    endpointURL: https://s3.int.exmaple.com
+    s3Credentials:
+      accessKeyId:
+        name: garage-creds
+        key: access-key-id
+      secretAccessKey:
+        name: garage-creds
+        key: secret-access-key
+      region:
+        name: garage-creds
+        key: region
+    wal:
+      compression: gzip
+      maxParallel: 8
+  retentionPolicy: 30d

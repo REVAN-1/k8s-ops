@@ -1,0 +1,111 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: excalidash
+  namespace: excalidash
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      excalidash-backend:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          excalidash-backend:
+            image:
+              repository: zimengxiong/excalidash-backend
+              tag: "0.5.0@sha256:aa86b392a64e2235e3cf0c6289f5b58182b7eb8e391851e480c947b8226abce4"
+            env:
+              DATABASE_URL: "file:/app/prisma/dev.db"
+              PORT: "8000"
+              NODE_ENV: "production"
+              AUTH_MODE: "oidc_enforced"
+              FRONTEND_URL: "https://draw.k8s.exmaple.com"
+              TRUST_PROXY: "1"
+              OIDC_PROVIDER_NAME: "Authentik"
+              OIDC_ISSUER_URL: "https://idm.exmaple.com/application/o/excalidash/"
+              OIDC_REDIRECT_URI: "https://draw.k8s.exmaple.com/api/auth/oidc/callback"        
+              OIDC_SCOPES: "openid profile email"
+            envFrom:
+              - secretRef:
+                  name: excalidash-env
+      excalidash-frontend:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          excalidash-frontend:
+            image:
+              repository: zimengxiong/excalidash-frontend
+              tag: "0.5.0"
+            env:
+              BACKEND_URL: "excalidash-backend:8000"
+
+    service:
+      excalidash-backend:
+        controller: excalidash-backend
+        forceRename: excalidash-backend
+        ports:
+          http:
+            port: 8000  
+      excalidash-frontend:
+        controller: excalidash-frontend
+        forceRename: excalidash-frontend
+        ports:
+          http:
+            port: 80
+  
+    ingress:
+      excalidash-frontend:
+        className: "cilium"
+        hosts:
+          - host: "draw.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: excalidash-frontend
+                  port: http
+        tls:
+          - hosts:
+              - "draw.k8s.exmaple.com"  
+
+    persistence:
+      data:
+        existingClaim: excalidash-data
+        advancedMounts:
+          excalidash-backend:
+            excalidash-backend:
+               - path: /app/prisma
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: excalidash-data
+  namespace: excalidash
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: csi-cephfs-sc
+  resources:
+    requests:
+      storage: 5Gi   

@@ -1,0 +1,89 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: flux-operator
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator
+  ref:
+    tag: "0.50.0"
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: flux-operator
+  namespace: flux-system
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chartRef:
+    kind: OCIRepository
+    name: flux-operator
+    namespace: flux-system
+  values:
+    web:
+      enabled: true
+      config:
+        baseURL: https://flux.k8s.exmaple.com
+        authentication:
+          type: Anonymous
+          anonymous:
+            username: flux-viewer
+            groups:
+              - flux-readonly
+        search:
+          cached: true
+      ingress:
+        enabled: true
+        className: cilium
+        hosts:
+          - host: flux.k8s.exmaple.com
+            paths:
+              - path: /
+                pathType: Prefix
+        tls:
+          - hosts:
+              - flux.k8s.exmaple.com
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-web-readonly
+subjects:
+  - kind: Group
+    name: flux-readonly
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: flux-web-user
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-cilium-ingress-to-flux-operator-web
+  namespace: flux-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/instance: flux-operator
+      app.kubernetes.io/name: flux-operator
+  ingress:
+    - fromEntities:
+        - ingress
+      toPorts:
+        - ports:
+            - port: "9080"
+              protocol: TCP

@@ -1,0 +1,32 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: talos-backup
+  namespace: talos
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: talos-backup
+      sourceRef:
+        kind: HelmRepository
+        name: sinextra
+        namespace: flux-system
+      version: "0.1.2"
+  values:
+    envSecretName: talos-backup-env
+
+    # -- Backup Schedule.
+    # min | hour | day | month | day of week
+    schedule: "0 10 * * 0"
+
+

@@ -1,0 +1,133 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: zabbix
+  namespace: zabbix
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: zabbix
+      sourceRef:
+        kind: HelmRepository
+        name:  zabbix
+        namespace: flux-system
+      version: "7.0.12"
+  values:
+    postgresAccess:
+      existingSecretName: "zabbix-db-secret"
+      secretHostKey: host
+      # -- key of the postgres access secret where the port for the postgres db is found
+      # if removed postgresAccess.port is used
+      secretPortKey: port
+      # -- key of the postgres access secret where user name for the postgres db is found
+      secretUserKey: username
+      # -- key of the unified postgres access secret where password for the postgres db is found
+      secretPasswordKey: password
+      # -- key of the postgres access secret where database name for the postgres db is found
+      # if removed postgresAccess.database is used
+      secretDBKey: dbname
+      # -- key of the postgres access secret where schema name for the postgres db is found. Can be left empty (defaults to "public", then). Only being used if external database is used (`postgresql.enabled` not set)
+      secretSchemaKey: ""
+
+    zabbixImageTag: ubuntu-7.0.26
+    # **Zabbix Server** configurations
+    zabbixServer:
+      # -- Enables use of **Zabbix Server**
+      enabled: true
+      zabbixServerHA:
+        enabled: false
+      # -- Number of replicas of ``zabbixServer`` module
+      replicaCount: 1
+      # -- set permissive podAntiAffinity to spread replicas over cluster nodes if replicaCount>1
+      podAntiAffinity: true
+      # -- optional set true open a port direct on node where Zabbix Server runs
+      hostPort: false
+      # -- optional set hostIP different from 0.0.0.0 to open port only on this IP
+      hostIP: 0.0.0.0
+      image:
+        # -- Zabbix Server Docker image name
+        repository: git.exmaple.com/revan/zabbix-server
+        # -- Zabbix Server Docker image tag, if you want to override zabbixImageTag
+        tag: latest
+        pullPolicy: Always
+      service:
+        type: LoadBalancer 
+        loadBalancerIP: "10.50.1.2"
+        loadBalancerClass: ""
+        sessionAffinity: None 
+        port: 10051
+        nodePort: 31051
+
+
+    # **PostgreSQL** configurations
+    postgresql:
+      # -- Create a database using Postgresql
+      enabled: false
+
+    # **Zabbix Web** configurations
+    zabbixWeb:
+      # -- Enables use of **Zabbix Web**
+      enabled: true
+      # -- Number of replicas of ``zabbixWeb`` module
+      replicaCount: 1
+      # -- set permissive podAntiAffinity to spread replicas over cluster nodes if replicaCount>1
+      podAntiAffinity: true
+      samlCertsSecretName: "saml-cert"
+      extraEnv:
+        - name: ZBX_SSO_SETTINGS
+          value: '{"baseurl": "https://zabbix.k8s.exmaple.com"}'
+        - name: ZBX_SERVER_HOST
+          value: "zabbix-zabbix-server"
+        - name: ZBX_SERVER_PORT
+          value: "10051"
+
+
+
+    # **Zabbix Web Service** configurations
+    zabbixWebService:
+      # -- Enables use of **Zabbix Web Service**
+      enabled: true
+      # -- Number of replicas of ``zabbixWebService`` module
+      replicaCount: 1
+      # -- set permissive podAntiAffinity to spread replicas over cluster nodes if replicaCount>1
+      podAntiAffinity: true
+
+
+    ingress:
+      # -- Enables Ingress
+      enabled: true
+      # -- Ingress annotations
+      annotations:
+        # nginx.ingress.kubernetes.io/rewrite-target: /
+        # kubernetes.io/ingress.class: nginx
+        # kubernetes.io/tls-acme: "true"
+      # -- Ingress hosts
+      hosts:
+        - host: zabbix.k8s.exmaple.com
+          paths:
+            - path: /
+              pathType: Prefix
+      # -- Ingress TLS configuration
+      tls:
+        - hosts:
+            - zabbix.k8s.exmaple.com
+      #  - secretName: chart-example-tls
+      #    hosts:
+      #      - chart-example.local
+      # For Kubernetes >= 1.18 you should specify the ingress-controller via the field ingressClassName
+      # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
+      ingressClassName: cilium
+      # -- pathType is only for k8s >= 1.1=
+      pathType: Prefix
+
+

@@ -1,0 +1,102 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kavita
+  namespace: media
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      kavita:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          app: 
+            image:
+              repository: docker.io/jvmilazz0/kavita
+              tag: "0.9.0"
+            env:
+              TZ: Europe/Berlin
+
+    service:
+      app:
+        controller: kavita
+        ports:
+          http:
+            port: 5000
+
+    persistence:
+      config:
+        existingClaim: kavita-config
+        advancedMounts:
+          kavita:
+            app:
+              - path: /kavita/config            
+      # Configure an NFS mount to store backups on
+      books:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/kavita/books
+        globalMounts:
+          - path: /books
+
+      comics:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/kavita/comics
+        globalMounts:
+          - path: /comics
+
+      manga:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/kavita/manga
+        globalMounts:
+          - path: /manga
+
+    ingress:
+      app:
+        className: "cilium"
+        hosts:
+          - host: "kavita.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts:
+              - "kavita.exmaple.com"
+            secretName: external-tls
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kavita-config
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 5Gi 

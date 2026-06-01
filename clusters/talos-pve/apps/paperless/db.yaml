@@ -1,0 +1,95 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: paperless-db
+  namespace: paperless
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  instances: 1
+  stopDelay: 30
+  smartShutdownTimeout: 180
+  enablePDB: false
+  managed:
+    services:
+      disabledDefaultServices: ["ro", "r"]
+    roles:
+      - name: paperless
+        superuser: true
+        login: true
+        passwordSecret:
+          name: paperless-db-secret
+  bootstrap:
+    initdb:
+      database: paperless
+      owner: paperless
+      secret:
+        name: paperless-db-secret
+  storage:
+    size: 20Gi
+    storageClass: csi-rbd-sc
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: garage
+
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: backup-paperless-postgresql
+  namespace: paperless
+spec:
+  schedule: "0 0 18 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: paperless-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: garage
+  namespace: paperless
+spec:
+  configuration:
+    destinationPath: s3://k8s-postgresql/
+    endpointURL: https://s3.int.exmaple.com
+    s3Credentials:
+      accessKeyId:
+        name: garage-creds
+        key: access-key-id
+      secretAccessKey:
+        name: garage-creds
+        key: secret-access-key
+      region:
+        name: garage-creds
+        key: region
+    wal:
+      compression: gzip
+      maxParallel: 8
+  retentionPolicy: 30d
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: paperless-db
+  namespace: paperless
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - paperless
+  selector:
+    matchLabels:
+      cnpg.io/cluster: paperless-db
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

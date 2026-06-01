@@ -1,0 +1,113 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: zabbix-db
+  namespace: zabbix
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  instances: 1
+  stopDelay: 30
+  smartShutdownTimeout: 180
+  enablePDB: false
+  managed:
+    services:
+      disabledDefaultServices: ["ro", "r"]
+    roles:
+      - name: zabbix
+        superuser: true
+        login: true
+        passwordSecret:
+          name: zabbix-db-secret
+  bootstrap:
+    initdb:
+      database: zabbix
+      owner: zabbix
+      secret:
+        name: zabbix-db-secret
+  storage:
+    size: 10Gi
+    storageClass: csi-rbd-sc
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: garage
+
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "1GB"
+      effective_cache_size: "3GB"
+      maintenance_work_mem: "256MB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+      work_mem: "5242kB"
+      huge_pages: "off"
+      min_wal_size: "1GB"
+      max_wal_size: "4GB"
+      max_worker_processes: "4"
+      max_parallel_workers_per_gather: "2"
+      max_parallel_workers: "4"
+      max_parallel_maintenance_workers: "2"
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: backup-zabbix-postgresql
+  namespace: zabbix
+spec:
+  schedule: "0 0 18 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: zabbix-db
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: garage
+  namespace: zabbix
+spec:
+  configuration:
+    destinationPath: s3://k8s-postgresql/
+    endpointURL: https://s3.int.exmaple.com
+    s3Credentials:
+      accessKeyId:
+        name: garage-creds
+        key: access-key-id
+      secretAccessKey:
+        name: garage-creds
+        key: secret-access-key
+      region:
+        name: garage-creds
+        key: region
+    wal:
+      compression: gzip
+      maxParallel: 8
+  retentionPolicy: 30d
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: zabbix-db
+  namespace: zabbix
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - zabbix
+  selector:
+    matchLabels:
+      cnpg.io/cluster: zabbix-db
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

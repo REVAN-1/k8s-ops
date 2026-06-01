@@ -1,0 +1,101 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: vymanager
+  namespace: vymanager
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      vymanager-frontend:
+        containers:
+          vymanager-frontend:
+            image:
+              repository: ghcr.io/community-vyprojects/vymanager-frontend
+              tag: "beta"
+              pullPolicy: Always
+
+            env:
+              NODE_ENV: "production"
+              VYMANAGER_ENV: "production"
+
+              BETTER_AUTH_URL: "https://vymanager.k8s.exmaple.com"
+              NEXT_PUBLIC_APP_URL: "https://vymanager.k8s.exmaple.com"
+              NEXT_PUBLIC_API_URL: "https://vymanager.k8s.exmaple.com"
+              BACKEND_URL: "http://backend:8000"
+              TRUSTED_ORIGINS: "https://vymanager.k8s.exmaple.com"
+
+            envFrom:
+              - secretRef:
+                  name: vymanager-env
+
+      vymanager-backend:
+        containers:
+          vymanager-backend:
+            image:
+              repository: ghcr.io/community-vyprojects/vymanager-backend
+              tag: "beta"
+              pullPolicy: Always
+
+            env:
+              NODE_ENV: "production"
+              VYMANAGER_ENV: "production"
+              FRONTEND_URL: "https://vymanager.k8s.exmaple.com"
+              TRUSTED_ORIGINS: "https://vymanager.k8s.exmaple.com"
+
+            envFrom:
+              - secretRef:
+                  name: vymanager-env
+
+    service:
+      vymanager-frontend:
+        controller: vymanager-frontend
+        ports:
+          http:
+            port: 3000
+
+      vymanager-backend:
+        controller: vymanager-backend
+        forceRename: backend
+        ports:
+          http:
+            port: 8000
+
+    ingress:
+      vymanager:
+        className: "cilium"
+        hosts:
+          - host: "vymanager.k8s.exmaple.com"
+            paths:
+              - path: /vyos
+                pathType: Prefix
+                service:
+                  identifier: vymanager-backend
+                  port: http
+
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: vymanager-frontend
+                  port: http
+
+        tls:
+          - hosts:
+              - "vymanager.k8s.exmaple.com"

@@ -1,0 +1,170 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: alloy
+  namespace: grafana
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: alloy
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+        namespace: flux-system
+      version: "1.8.2"
+  values:
+    controller:
+      type: deployment
+      replicas: 1
+
+    rbac:
+      create: true
+
+    alloy:
+      enableHttpServerPort: true
+      listenAddr: 0.0.0.0
+      listenPort: 80
+      extraEnv:
+        - name: TZ
+          value: Europe/Berlin
+      envFrom:
+        - secretRef:
+            name: alloy-secret
+
+      extraPorts:
+        - name: syslog-udp
+          port: 514
+          targetPort: 514
+          protocol: UDP
+        - name: syslog-tcp
+          port: 601
+          targetPort: 601
+          protocol: TCP
+
+      configMap:
+        create: true
+        content: |
+          loki.source.syslog "syslog" {
+            listener {
+              address                        = "0.0.0.0:601"
+              protocol                       = "tcp"
+              use_incoming_timestamp         = false
+              max_message_length             = 0
+              rfc3164_default_to_current_year = true
+              syslog_format                  = "rfc3164"
+              labels = {
+                job          = "syslog",
+                protocol     = "tcp",
+                format       = "rfc3164",
+                port         = "601",
+                service_name = "syslog",
+              }
+            }
+
+            listener {
+              address                        = "0.0.0.0:514"
+              protocol                       = "udp"
+              syslog_format                  = "rfc3164"
+              use_incoming_timestamp         = false
+              rfc3164_default_to_current_year = true
+              labels = {
+                job          = "syslog",
+                protocol     = "udp",
+                format       = "rfc3164",
+                port         = "514",
+                service_name = "syslog",
+              }
+            }
+
+            forward_to = [loki.write.loki.receiver]
+          }
+
+          discovery.kubernetes "pods" {
+            role = "pod"
+          }
+
+          discovery.relabel "filtered_pods" {
+            targets = discovery.kubernetes.pods.targets
+
+            rule {
+              source_labels = ["__meta_kubernetes_namespace"]
+              action        = "keep"
+              regex         = "(nextcloud|vaultwarden|authentik|media|jellyfin)"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_namespace"]
+              action        = "replace"
+              target_label  = "namespace"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_pod_name"]
+              action        = "replace"
+              target_label  = "pod"
+            }
+
+            rule {
+              source_labels = ["__meta_kubernetes_pod_container_name"]
+              action        = "replace"
+              target_label  = "container"
+            }
+
+            rule {
+              source_labels = ["pod"]
+              action        = "replace"
+              target_label  = "service"
+              regex         = "^([a-z0-9-]+?)(?:-[a-z0-9]{5,}|-[a-z0-9]{9,}-[a-z0-9]{5,}|-[0-9]{6,})?$"
+              replacement   = "$1"
+            }
+          }
+
+          loki.source.kubernetes "pod_logs" {
+            targets    = discovery.relabel.filtered_pods.output
+            forward_to = [loki.write.loki.receiver]
+          }
+
+          loki.write "loki" {
+            endpoint {
+              url = "https://loki.k8s.exmaple.com/loki/api/v1/push"
+              basic_auth {
+                username = sys.env("LOKI_USERNAME")
+                password = sys.env("LOKI_PASSWORD")
+              }
+            }
+          }
+
+
+    extraObjects:
+      - apiVersion: v1
+        kind: Service
+        metadata:
+          name: alloy-lb
+          namespace: grafana
+          labels:
+            app.kubernetes.io/name: alloy
+        spec:
+          type: LoadBalancer
+          loadBalancerIP: 10.50.1.3
+          externalTrafficPolicy: Local
+          selector:
+            app.kubernetes.io/name: alloy
+          ports:
+            - name: syslog-udp
+              port: 514
+              targetPort: 514
+              protocol: UDP
+            - name: syslog-tcp
+              port: 601
+              targetPort: 601
+              protocol: TCP

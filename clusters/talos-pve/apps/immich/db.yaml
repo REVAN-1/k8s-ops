@@ -1,0 +1,125 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: immich-postgresql
+  namespace: immich
+spec:
+  imageName: ghcr.io/tensorchord/cloudnative-pgvecto.rs:16.5-v0.3.0
+  instances: 3
+  startDelay: 30
+  stopDelay: 100
+  smartShutdownTimeout: 180
+  enablePDB: false
+  primaryUpdateStrategy: unsupervised
+  primaryUpdateMethod: restart
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: "kubernetes.io/hostname"
+    podAntiAffinityType: required
+  postgresql:
+    synchronous:
+      method: any
+      number: 1          
+    parameters:
+      max_connections: "200"
+    shared_preload_libraries:
+      - "vectors.so"
+  resources:
+    requests:
+      memory: "1024Mi"
+      cpu: 100m
+    limits:
+      memory: "2048Mi"
+      cpu: 500m
+  managed:
+    services:
+      disabledDefaultServices: ["ro", "r"]
+    roles:
+      - name: immich
+        superuser: true
+        login: true
+        passwordSecret:
+          name: immich-postgresql
+  bootstrap:
+    initdb:
+      database: immich
+      owner: immich
+      secret:
+        name: immich-postgresql
+      postInitSQL:
+        - ALTER SYSTEM SET search_path TO "$user", public, vectors;
+        - SET search_path TO "$user", public, vectors;      
+        - CREATE EXTENSION IF NOT EXISTS "vectors";
+        - CREATE EXTENSION IF NOT EXISTS "cube" CASCADE;
+        - CREATE EXTENSION IF NOT EXISTS "earthdistance" CASCADE;
+        - ALTER SCHEMA vectors OWNER TO "immich";
+        - GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA vectors TO "immich";
+        - GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "immich";
+  storage:
+    size: 10Gi
+    storageClass: csi-rbd-sc
+
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: garage
+
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: backup-immich-postgresql
+  namespace: immich
+spec:
+  schedule: "0 0 */4 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: immich-postgresql
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: garage
+  namespace: immich
+spec:
+  configuration:
+    destinationPath: s3://k8s-postgresql/
+    endpointURL: https://s3.int.exmaple.com
+    s3Credentials:
+      accessKeyId:
+        name: garage-creds
+        key: access-key-id
+      secretAccessKey:
+        name: garage-creds
+        key: secret-access-key
+      region:
+        name: garage-creds
+        key: region
+    wal:
+      compression: gzip
+      maxParallel: 8
+  retentionPolicy: 30d
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: immich-db
+  namespace: immich
+  labels:
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - immich
+  selector:
+    matchLabels:
+      cnpg.io/cluster: immich-postgresql
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

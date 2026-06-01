@@ -1,0 +1,27 @@
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-vaultwarden
+  namespace: vaultwarden
+spec:
+  sourcePVC: vaultwarden-data-vaultwarden-0
+  trigger:
+    schedule: "0 12 * * *"
+  restic:
+    pruneIntervalDays: 14
+    repository: restic-config-vaultwarden
+    # Retention policy for backups
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheStorageClassName: csi-rbd-sc
+    cacheAccessModes:
+      - ReadWriteOnce
+    moverSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      fsGroup: 0

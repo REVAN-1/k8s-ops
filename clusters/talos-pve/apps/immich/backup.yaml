@@ -1,0 +1,34 @@
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-immich
+  namespace: immich
+spec:
+  sourcePVC: immich-data
+  trigger:
+    schedule: "0 14 * * *"
+  restic:
+    pruneIntervalDays: 7
+    repository: immich-restic-config
+    # Retention policy for backups
+    retain:
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheStorageClassName: csi-rbd-sc
+    cacheAccessModes:
+      - ReadWriteOnce
+    cacheCapacity: 4Gi
+    moverSecurityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      fsGroup: 0
+    moverResources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: "2"
+        memory: 4Gi

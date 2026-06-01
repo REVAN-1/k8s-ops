@@ -1,0 +1,93 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: outline
+  namespace: outline
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  valuesFrom:
+    - kind: Secret
+      name: outline-secrets
+      valuesKey: values.yaml
+  values:
+    controllers:
+      outline:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          app: 
+            image:
+              repository: docker.getoutline.com/outlinewiki/outline
+              tag: "latest"
+            env:
+              TZ: Europe/Berlin
+              NODE_ENV: production
+              PGSSLMODE: disable
+              URL: https://outline.k8s.exmaple.com
+              REDIS_URL: redis://outline-valkey:6379
+              PORT: 3000
+              FORCE_HTTPS: true
+              AWS_REGION: local
+              AWS_S3_ACCELERATE_URL: 
+              AWS_S3_UPLOAD_BUCKET_URL: http://10.50.0.30
+              AWS_S3_UPLOAD_BUCKET_NAME: outline
+              AWS_S3_FORCE_PATH_STYLE: true
+              AWS_S3_ACL: private
+              FILE_STORAGE: s3              
+              OIDC_AUTH_URI: https://idm.exmaple.com/application/o/authorize/
+              OIDC_TOKEN_URI: https://idm.exmaple.com/application/o/token/
+              OIDC_USERINFO_URI: https://idm.exmaple.com/application/o/userinfo/
+              OIDC_USERNAME_CLAIM: preferred_username
+              OIDC_DISPLAY_NAME: OpenID Connect
+              OIDC_SCOPES: "openid profile email"
+      valkey:
+        containers:
+          valkey:
+            image:
+              repository: valkey/valkey
+              tag: "9-alpine@sha256:a35428eba9043cc0b79dbe54100f0c92784f2de00ad09b01182bfb1c5c83d1bd"       
+
+    service:
+      app:
+        controller: outline
+        ports:
+          http:
+            port: 3000
+      valkey:
+        controller: valkey 
+        ports:
+          valkey:
+            port: 6379
+
+    ingress:
+      app:
+        className: "cilium"
+        hosts:
+          - host: "outline.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts:
+              - "outline.k8s.exmaple.com"          

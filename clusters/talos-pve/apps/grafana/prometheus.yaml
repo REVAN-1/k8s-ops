@@ -1,0 +1,90 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: prometheus
+  namespace: grafana
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: prometheus
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus
+        namespace: flux-system
+      version: "29.9.0"
+  values:
+    serverFiles:
+      prometheus.yml:
+       scrape_configs:
+        - job_name: 'pve-exporter'
+          static_configs:
+            - targets:
+              - 10.50.0.11:9221
+              - 10.50.0.12:9221
+              - 10.50.0.14:9221
+          metrics_path: /pve
+          params:
+            module: [default]
+        - job_name: 'mikrotik'
+          scrape_interval: 15s
+          static_configs:
+              - targets:
+                  - 'mktxp-exporter:49090'
+        - job_name: 'load-balancer-metrics'
+          static_configs:
+            - targets: ['10.50.0.15:8405']
+        - job_name: 'crowdsec_mailcow'
+          static_configs:
+            - targets: ['10.10.10.3:6060']
+              labels:
+                machine: 'mailcow'
+        - job_name: 'garage'
+          authorization:
+            type: Bearer
+            credentials_file: /etc/secrets/garage/token
+          static_configs:
+            - targets:
+                - 's3.int.exmaple.com:3903'
+        - job_name: 'volsync'
+          metrics_path: /metrics
+          scheme: https
+          static_configs:
+            - targets: 
+                - volsync-metrics.volsync-system.svc.cluster.local:8443
+          tls_config:
+            insecure_skip_verify: true
+
+    server:
+      extraSecretMounts:
+        - name: garage-token
+          mountPath: /etc/secrets/garage
+          secretName: prometheus-garage-token
+          readOnly: true
+      persistentVolume:
+        enabled: true
+        accessModes:
+          - ReadWriteOnce
+        size: 15Gi
+        storageClass: csi-rbd-sc
+      resources:
+        limits:
+          cpu: 400m
+          memory: 1Gi
+    prometheus-node-exporter:
+      enabled: false
+    alertmanager:
+      enabled: false
+    prometheus-pushgateway:
+      enabled: false
+    kube-state-metrics:
+      enabled: false

@@ -1,0 +1,57 @@
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-nextcloud-config
+  namespace: nextcloud
+spec:
+  sourcePVC: nextcloud-nextcloud
+  trigger:
+    schedule: "0 8 * * *"
+  restic:
+    pruneIntervalDays: 14
+    repository: restic-config
+    # Retention policy for backups
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheStorageClassName: csi-rbd-sc
+    cacheAccessModes:
+      - ReadWriteOnce
+    moverSecurityContext:
+      runAsUser: 33
+      runAsGroup: 33
+      fsGroup: 33
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: backup-nextcloud-data
+  namespace: nextcloud
+spec:
+  sourcePVC: nextcloud-data
+  trigger:
+    schedule: "0 8 * * *"
+  restic:
+    pruneIntervalDays: 14
+    repository: data-restic-config
+    # Retention policy for backups
+    retain:
+      hourly: 6
+      daily: 5
+      weekly: 4
+      monthly: 2
+      yearly: 1
+    copyMethod: Direct
+    cacheCapacity: 4Gi
+    cacheStorageClassName: csi-rbd-sc
+    cacheAccessModes:
+      - ReadWriteOnce
+    moverSecurityContext:
+      runAsUser: 33
+      runAsGroup: 33
+      fsGroup: 33

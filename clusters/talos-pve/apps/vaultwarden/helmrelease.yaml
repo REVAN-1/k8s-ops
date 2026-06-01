@@ -1,0 +1,135 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: vaultwarden
+  namespace: vaultwarden
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: vaultwarden
+      sourceRef:
+        kind: HelmRepository
+        name:  vaultwarden
+        namespace: flux-system
+      version: "0.38.0"
+  valuesFrom:
+    - kind: Secret
+      name: vaultwarden-secrets
+      valuesKey: values.yaml
+  values:
+
+    image:
+      tag: "1.36.0-alpine"
+
+    resourceType: "Deployment"
+
+    storage:
+      data:
+        name: "vaultwarden-data"
+        size: "2Gi"
+        class: "csi-cephfs-sc"
+        path: "/data"
+        accessMode: "ReadWriteMany"
+        keepPvc: true
+
+    database:
+      ## @param database.type Database type, either mysql or postgresql
+      ## Default is a sqlite database.
+      ##
+      type: "postgresql"
+      ## @param database.host Database hostname or IP address
+      ##
+      host: "vaultwarden-db-rw"
+      ## @param database.port Database port
+      ## Default for MySQL is 3306, default for PostgreSQL is 5432
+      port: "5432"
+      ## @param database.dbName Database name
+      ##
+      dbName: "vaultwarden"
+      existingSecret: vaultwarden-db-secret
+      existingSecretUserKey: username
+      existingSecretPasswordKey: password
+
+    domain: "https://bitwarden.exmaple.com"
+
+    smtp:
+      host: "mail.exmaple.com"
+      ## @param smtp.security SMTP Encryption method
+      ## Possible values:
+      ##  - starttls: explicit TLS using ports 587 or 25
+      ##  - force_tls: implicit TLS using port 465
+      ##  - off: no encryption, using port 25, unless using STARTTLS
+      ##
+      security: "force_tls"
+      ## @param smtp.port SMTP port
+      ##
+      port: 465
+      ## @param smtp.from SMTP sender email address
+      ## Example: juan.delacruz@gmail.com
+      ##
+      from: "bitwarden@exmaple.com"
+      ## @param smtp.fromName SMTP sender FROM
+      ## @param smtp.authMechanism SMTP authentication mechanism
+      ## Possible values: "Plain", "Login", "Xoauth2"
+      ## Multiple options need to be separated by a comma. (not tested)
+      ##
+      authMechanism: "Login"
+      debug: false
+
+    adminToken:
+      existingSecret: "vaultwarden-disable-admin"
+      existingSecretKey: "token"
+
+    replicas: 1
+    service:
+      sessionAffinity: ClientIP
+      sessionAffinityConfig:
+        clientIP:
+          timeoutSeconds: 10800    
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: vaultwarden
+                app.kubernetes.io/instance: vaultwarden
+            topologyKey: kubernetes.io/hostname
+
+    ingress:
+      ## @param ingress.enabled Deploy an ingress resource.
+      ##
+      enabled: true
+      ## @param ingress.class Ingress resource class
+      ## The Ingress class to use, e. g. "nginx" for a nginx ingress controller or "alb" for a AWS LB controller.
+      #
+      class: "cilium"
+      ## @param ingress.nginxIngressAnnotations Add nginx specific ingress annotations
+      ## This annotations are only makes sense for the kubernetes nginx ingress controller (https://kubernetes.github.io/ingress-nginx/)
+      ##
+      nginxIngressAnnotations: true
+      ## @param ingress.additionalAnnotations Additional annotations for the ingress resource.
+      ##
+      additionalAnnotations: {}
+      ## @param ingress.labels Additional labels for the ingress resource.
+      ##
+      labels: {}
+      ## @param ingress.tls Enable TLS on the ingress resource.
+      ##
+      tls: true
+      tlsSecret: "external-tls"
+      ## @param ingress.hostname Hostname for the ingress.
+      ##
+      hostname: "bitwarden.exmaple.com"
+
+    timeZone: "Europe/Berlin"
+

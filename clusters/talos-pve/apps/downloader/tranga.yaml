@@ -1,0 +1,142 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tranga
+  namespace: downloader
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      tranga-website:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          tranga-website: 
+            image:
+              repository: glax/tranga-website
+              tag: "cuttingedge"
+              pullPolicy: Always
+            env:
+              TZ: Europe/Berlin
+              API_URL: http://tranga-tranga-api:6531
+      tranga-api:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          tranga-api: 
+            image:
+              repository: glax/tranga-api
+              tag: "cuttingedge"
+              pullPolicy: Always
+            env:
+              TZ: Europe/Berlin
+              POSTGRES_HOST: "tranga-db-rw"
+              POSTGRES_DB: "tranga"
+              POSTGRES_USER: "tranga"
+              POSTGRES_PASSWORD: "n72BPadDpuZtB3l"
+              FLARESOLVERR_URL: "tranga-flaresolverr"
+            resources:
+              requests:
+                cpu: "250m"     
+                memory: "128Mi"  
+              limits:
+                cpu: "500m"     
+                memory: "1024Mi"  
+      flaresolverr:
+        strategy: Recreate
+        replicas: 3
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          flaresolverr:
+            image:
+              repository: ghcr.io/flaresolverr/flaresolverr
+              tag: "latest"
+            env:
+              TZ: Europe/Berlin
+              LOG_LEVEL: info
+
+
+    service:
+      tranga-website:
+        controller: tranga-website
+        ports:
+          http:
+            port: 80
+      tranga-api:
+        controller: tranga-api
+        ports:
+          http:
+            port: 6531        
+      flaresolverr:
+        controller: flaresolverr
+        ports:
+          http:
+            port: 8191
+
+    persistence:
+      config:
+        existingClaim: tranga-api-config
+        advancedMounts:
+          tranga-api:
+            tranga-api:
+              - path: /usr/share/tranga-api            
+
+
+      download:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/kavita/manga
+        advancedMounts:
+          tranga-api:          
+            tranga-api:        
+              - path: /Manga
+
+
+    ingress:
+      tranga-website:
+        className: "cilium"
+        hosts:
+          - host: "tranga.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: tranga-website
+                  port: http
+        tls:
+          - hosts:
+              - "tranga.k8s.exmaple.com"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tranga-api-config
+  namespace: downloader
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 2Gi 

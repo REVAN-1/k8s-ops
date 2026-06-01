@@ -1,0 +1,78 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: certwarden
+  namespace: certwarden
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      certwarden:
+        strategy: Recreate
+        pod:
+          dnsPolicy: None
+          dnsConfig:
+            nameservers:
+              - 1.1.1.1
+              - 9.9.9.9
+            options:
+              - name: ndots
+                value: "1"
+        containers:
+          certwarden:
+            image:
+              repository: ghcr.io/gregtwallace/certwarden
+              tag: v0.29.5@sha256:47bef0375d637860a05ad13162fdb49958618dff116f549186e2a05ec49b9226
+            resources:
+              requests:
+                cpu: 100m
+              limits:
+                cpu: 200m
+                memory: 512Mi
+
+    service:
+      certwarden:
+        controller: certwarden
+        ports:
+          http:
+            port: 4050
+
+    ingress:
+      certwarden:
+        className: "cilium"
+        hosts:
+          - host: "certwarden.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: certwarden
+                  port: http
+        tls:
+          - hosts:
+              - "certwarden.k8s.exmaple.com"
+
+    persistence:
+      config:
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        globalMounts:
+          - path: /app/data

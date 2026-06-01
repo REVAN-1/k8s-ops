@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - onlyoffice.yaml
+  - onlyoffice-db.yaml
+  - rabbitmq.yaml
+  - nextcloud.yaml
+  - db.yaml
+  - secrets.yaml
+  - backup.yaml

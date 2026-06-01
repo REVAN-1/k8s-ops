@@ -1,0 +1,87 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: lidify
+  namespace: media
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      lidify:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          app: 
+            image:
+              repository: thewicklowwolf/lidify
+              tag: "latest"
+            env:
+              TZ: Europe/Berlin
+              mode: LastFM
+              lidarr_address: http://lidarr:8686
+              root_folder_path: /data
+            envFrom:
+              - secretRef:
+                  name: lidify-env
+
+    service:
+      app:
+        controller: lidify
+        ports:
+          http:
+            port: 5000
+
+          
+    persistence:
+      config:
+        existingClaim: lidify-config
+        advancedMounts:
+          lidify:
+            app:
+              - path: /lidify/config  
+
+    ingress:
+      app:
+        className: "cilium"
+        hosts:
+          - host: "lidify.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+        tls:
+          - hosts:
+              - "lidify.k8s.exmaple.com"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lidify-config
+  namespace: media
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 1Gi 

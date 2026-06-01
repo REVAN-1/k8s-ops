@@ -1,0 +1,138 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cilium
+  namespace: kube-system
+spec:
+  interval: 5m
+  chart:
+    spec:
+      chart: cilium
+      sourceRef:
+        kind: HelmRepository
+        name: cilium
+        namespace: flux-system
+      version: "1.19.4"
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    autoDirectNodeRoutes: true
+    bgpControlPlane:
+      enabled: true
+    cgroup:
+      automount:
+        enabled: false
+      hostRoot: /sys/fs/cgroup
+    dashboards:
+      enabled: true
+      annotations:
+        grafana_folder: Cilium
+    encryption:
+      enabled: true
+      type: wireguard
+      nodeEncryption: false
+    hubble:
+      enabled: true
+      metrics:
+        enabled:
+          - dns
+          - drop
+          - tcp
+          - flow
+          - port-distribution
+          - icmp
+          - httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction
+        enableOpenMetrics: true
+        serviceMonitor:
+          enabled: true
+        dashboards:
+          enabled: true
+          annotations:
+            grafana_folder: Cilium
+      relay:
+        enabled: true
+      ui:
+        enabled: true
+        ingress:
+          enabled: true
+          className: cilium
+          hosts:
+            - hubble.k8s.exmaple.com
+          tls:
+            - hosts:
+                - hubble.k8s.exmaple.com
+    resources: 
+       limits:
+         cpu: 400m
+         memory: 1Gi
+       requests:
+         cpu: 100m
+         memory: 512Mi
+    ipam:
+      mode: kubernetes
+    ipv4NativeRoutingCIDR: "10.244.0.0/16"
+    ipv4:
+      enabled: true
+    ipv6:
+      enabled: false
+    enableIPv4Masquerade: true
+    ingressController:
+      enabled: true
+      default: true
+      defaultSecretNamespace: cert-manager
+      defaultSecretName: default-tls
+      loadbalancerMode: shared
+      service:
+        type: LoadBalancer
+        loadBalancerIP: 10.50.1.1
+        externalTrafficPolicy: Local
+    k8sServiceHost: 127.0.0.1
+    k8sServicePort: 7445
+    kubeProxyReplacement: true
+    kubeProxyReplacementHealthzBindAddr: 0.0.0.0:10256
+    l2announcements:
+      enabled: false
+    loadBalancer:
+      algorithm: maglev
+      mode: dsr
+    operator:
+      dashboards:
+        enabled: true
+        annotations:
+          grafana_folder: Cilium
+      prometheus:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+      replicas: 2
+      rollOutPods: true
+    prometheus:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        trustCRDsExist: true
+      annotations:
+        grafana_folder: Cilium
+    routingMode: native
+    securityContext:
+      capabilities:
+        ciliumAgent:
+          - CHOWN
+          - KILL
+          - NET_ADMIN
+          - NET_RAW
+          - IPC_LOCK
+          - SYS_ADMIN
+          - SYS_RESOURCE
+          - PERFMON
+          - BPF
+          - DAC_OVERRIDE
+          - FOWNER
+          - SETGID
+          - SETUID
+        cleanCiliumState:
+          - NET_ADMIN
+          - SYS_ADMIN
+          - SYS_RESOURCE

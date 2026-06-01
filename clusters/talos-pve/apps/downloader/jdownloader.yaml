@@ -1,0 +1,75 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: jdownloader2
+  namespace: downloader
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: jdownloader2
+      sourceRef:
+        kind: HelmRepository
+        name: my-jdownloader
+        namespace: flux-system
+      version: ""
+  values:
+    image: 
+      repository: jlesage/jdownloader-2
+      tag: latest
+      pullPolicy: Always
+    myjd:
+      existingSecretName: "jdownloader2-secrets"
+
+    persistence:
+      enabled: true
+      existingClaim: "jdownloader2-nfs"
+
+    service:
+      # -- enable the web interface (via browser)
+      web:
+        # -- enable "web" service
+        enabled: true
+        # -- exposed port of the service
+        port: 5800
+        # -- service type (only used when ingress.enabled: false)
+        type: ClusterIP
+      mykd:
+        # -- enable "mykd" service
+        enabled: true
+
+    ingress:
+      enabled: false
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jdownloader-ingress
+  namespace: downloader
+  annotations:
+    kubernetes.io/ingress.class: cilium
+spec:
+  tls:
+    - hosts:
+        - jdownloader.k8s.exmaple.com
+  rules:
+    - host: jdownloader.k8s.exmaple.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jdownloader2-web
+                port:
+                  number: 5800
