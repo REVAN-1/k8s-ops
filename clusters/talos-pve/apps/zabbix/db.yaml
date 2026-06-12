@@ -25,7 +25,7 @@ spec:
       secret:
         name: zabbix-db-secret
   storage:
-    size: 10Gi
+    size: 15Gi
     storageClass: csi-rbd-sc
 
   plugins:

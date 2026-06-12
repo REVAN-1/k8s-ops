@@ -6,7 +6,7 @@ metadata:
 spec:
   secretName: default-tls
   issuerRef:
-    name: letsencrypt-dns
+    name: letsencrypt
     kind: ClusterIssuer
   dnsNames:
   - "*.k8s.exmaple.com"   
@@ -14,5 +14,5 @@ spec:
   secretTemplate:
     annotations:
       reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
-      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "gameserver"
+      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "gameserver,actual"
       reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"

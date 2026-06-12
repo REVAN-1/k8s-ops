@@ -39,7 +39,7 @@ spec:
       # -- key of the postgres access secret where schema name for the postgres db is found. Can be left empty (defaults to "public", then). Only being used if external database is used (`postgresql.enabled` not set)
       secretSchemaKey: ""
 
-    zabbixImageTag: ubuntu-7.0.26
+    zabbixImageTag: ubuntu-7.0.27
     # **Zabbix Server** configurations
     zabbixServer:
       # -- Enables use of **Zabbix Server**
@@ -56,10 +56,11 @@ spec:
       hostIP: 0.0.0.0
       image:
         # -- Zabbix Server Docker image name
-        repository: git.exmaple.com/revan/zabbix-server
+        repository: registry.k8s.exmaple.com/custom-container/zabbix-server
         # -- Zabbix Server Docker image tag, if you want to override zabbixImageTag
-        tag: latest
         pullPolicy: Always
+        pullSecrets:
+          - pull-secrets
       service:
         type: LoadBalancer 
         loadBalancerIP: "10.50.1.2"

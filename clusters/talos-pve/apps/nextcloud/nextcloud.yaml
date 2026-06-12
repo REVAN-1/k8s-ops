@@ -16,7 +16,7 @@ spec:
         kind: HelmRepository
         name: nextcloud
         namespace: flux-system
-      version: "9.1.1"
+      version: "9.1.2"
   values:
     replicaCount: 3
     affinity:

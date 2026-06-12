@@ -32,7 +32,7 @@ spec:
           app: 
             image:
               repository: lscr.io/linuxserver/sabnzbd
-              tag: 5.0.3@sha256:2924efdf345e8e69cc2137b21fd3222843ac882ee0bf54207e6524774f89121e
+              tag: 5.0.4@sha256:c2f1826a3d231b9506554a60447e763157fd8ba4f600a4a864d6d0ddae00a0aa
               pullPolicy: Always
             env:
               TZ: Europe/Berlin
@@ -43,6 +43,56 @@ spec:
               limits:
                 cpu: "1"     
                 memory: "2048Mi"  
+          gluetun:
+            image:
+              repository: ghcr.io/qdm12/gluetun
+              tag: v3.41
+            env:
+              VPN_SERVICE_PROVIDER: custom
+              VPN_TYPE: wireguard
+              VPN_INTERFACE: wg0
+              VPN_ENDPOINT_PORT: 51820
+              VPN_PORT_FORWARDING: off
+              VPN_PORT_FORWARDING_PROVIDER: protonvpn
+              WIREGUARD_MTU: 1280
+              HEALTH_ICMP_TARGET_IPS: "1.1.1.1"
+              DOT: off
+              FIREWALL_INPUT_PORTS: 8080
+              FIREWALL_OUTBOUND_SUBNETS: 10.10.10.0/24,10.50.0.0/23,10.244.0.0/16,192.168.178.0/24
+              WIREGUARD_PERSISTENT_KEEPALIVE_INTERVAL: 25s
+            envFrom:
+              - secretRef:
+                  name: sabnzb-secret
+            probes:
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command: ["/gluetun-entrypoint", "healthcheck"]
+                  periodSeconds: 10
+                  failureThreshold: 30
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command: ["/gluetun-entrypoint", "healthcheck"]
+                  periodSeconds: 30
+                  timeoutSeconds: 10
+                  failureThreshold: 3
+            securityContext:
+              capabilities:
+                add:
+                  - NET_ADMIN
+              allowPrivilegeEscalation: false
+            resources:
+              requests:
+                cpu: 100m
+              limits:
+                cpu: 200m
+                memory: 512Mi
+
 
     service:
       app:

@@ -1,7 +1,7 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: onlyoffice
+  name: euro-office
   namespace: nextcloud
 spec:
   interval: 10m
@@ -22,54 +22,58 @@ spec:
         name: bjw-s
         namespace: flux-system
       version: "5.0.1"
-  valuesFrom:
-    - kind: Secret
-      name: onlyoffice-secrets
-      valuesKey: values.yaml
   values:
     controllers:
-      onlyoffice:
+      euro-office:
         strategy: Recreate
         annotations:
           reloader.stakater.com/auto: "false"
         containers:
-          app: 
+          euro-office: 
             image:
-              repository: onlyoffice/documentserver
-              tag: "9.4@sha256:e3da62a847b9a5d51a11f73cfea1d9c13c3be3809614490d4edddcf01dcf919b"
+              repository: ghcr.io/euro-office/documentserver
+              tag: "v9.3.1"
               pullPolicy: IfNotPresent
             env:
               TZ: Europe/Berlin
-              DB_TYPE: postgres
-              DB_HOST: onlyoffice-db-rw
-              DB_PORT: 5432
-              DB_NAME: onlyoffice
-              DB_USER: onlyoffice
-            # Uncomment strings below to enable the JSON Web Token validation.
-              JWT_ENABLED: true
+              JWT_ENABLED: "true"
               JWT_HEADER: AuthorizationJwt
-              JWT_IN_BOD: true
-              USE_UNAUTHORIZED_STORAGE: true              
-
-       
+              USE_UNAUTHORIZED_STORAGE: "true"     
+              PLUGINS_ENABLED: "true"
+              EXAMPLE_ENABLED: "false"
+              GENERATE_FONTS: "true"         
+            envFrom:
+              - secretRef:
+                  name: euro-office-env
+      rabbitmq:
+        containers:
+          rabbitmq:
+            image:
+              repository: rabbitmq
+              tag: "4.3-alpine"       
 
     service:
-      app:
-        controller: onlyoffice
+      euro-office:
+        controller: euro-office
         ports:
           http:
             port: 80
           https:
             port: 443
-
+      rabbitmq:
+        controller: rabbitmq
+        forceRename: rabbitmq
+        ports:
+          tcp:
+            port: 5672
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: onlyoffice-lb
+  name: euro-office-lb
   namespace: nextcloud
   labels:
-    app: onlyoffice
+    app: euro-office
 spec:
   type: LoadBalancer
   loadBalancerIP: 10.50.1.7
@@ -79,5 +83,5 @@ spec:
     protocol: TCP
     name: http
   selector:
-    app.kubernetes.io/name: onlyoffice
+    app.kubernetes.io/name: euro-office
 

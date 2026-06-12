@@ -1,0 +1,95 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: actual
+  namespace: actual
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+  values:
+    controllers:
+      actual:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "false"
+        containers:
+          actual: 
+            image:
+              repository: docker.io/actualbudget/actual-server
+              tag: "26.6.0-alpine"   
+            env:
+              ACTUAL_HTTPS_KEY: "/data/tls.key"
+              ACTUAL_HTTPS_CERT: "/data/tls.crt"
+
+    service:
+      actual:
+        controller: actual
+        ports:
+          http:
+            port: 5006
+
+    persistence:
+      data:
+        existingClaim: actual-data
+        advancedMounts:
+          actual:
+            actual:
+               - path: /data
+      tls: 
+        enabled: true
+        type: secret
+        name: default-tls
+        advancedMounts:
+          actual:
+            actual:
+              - path: /data/tls.crt
+                subPath: tls.crt     
+                readOnly: true
+              - path: /data/tls.key
+                subPath: tls.key   
+          
+    ingress:
+      actual:
+        className: "cilium"
+        annotations:
+          ingress.cilium.io/tls-passthrough: "enabled"
+        hosts:
+          - host: "actual.k8s.exmaple.com"
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: actual
+                  port: http
+        tls:
+          - hosts:
+              - "actual.k8s.exmaple.com"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: actual-data
+  namespace: actual
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 10Gi 

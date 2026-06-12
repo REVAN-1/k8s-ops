@@ -6,7 +6,7 @@ metadata:
 spec:
   secretName: external-tls
   issuerRef:
-    name: letsencrypt-dns
+    name: letsencrypt
     kind: ClusterIssuer
   dnsNames:
   - "*.exmaple.com"   
@@ -14,6 +14,6 @@ spec:
   secretTemplate:
     annotations:
       reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
-      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "nextcloud,authentik,gokapi,media,vaultwarden,matrix,cilium-secrets,jellyfin"
+      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "nextcloud,authentik,gokapi,media,vaultwarden,cilium-secrets,jellyfin"
       reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
-      reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "nextcloud,authentik,gokapi,media,vaultwarden,matrix,cilium-secrets,jellyfin"
+      reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "nextcloud,authentik,gokapi,media,vaultwarden,cilium-secrets,jellyfin"

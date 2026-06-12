@@ -7,3 +7,4 @@ resources:
   - config.yaml
   - default-cert.yaml
   - external-cert.yaml
+  - hetzner.yaml

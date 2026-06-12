@@ -284,3 +284,21 @@ spec:
   ref:
     tag: 0.18.5
   url: oci://ghcr.io/home-operations/charts-mirror/volsync-perfectra1n
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: hcloud
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url:  https://charts.hetzner.cloud
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: cilium
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://helm.cilium.io/
