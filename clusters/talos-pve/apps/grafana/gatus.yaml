@@ -1,0 +1,153 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gatus
+  namespace: grafana
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: gatus
+      sourceRef:
+        kind: HelmRepository
+        name: twin
+        namespace: flux-system
+      version: "1.5.0"
+  values:
+    ingress:
+      enabled: true
+      annotations: 
+        kubernetes.io/ingress.class: cilium
+      hosts:
+        - gatus.k8s.exmaple.com 
+      tls: 
+        - hosts:
+            - gatus.k8s.exmaple.com
+    persistence:
+      enabled: false
+    config:
+      metrics: true
+      endpoints:
+        - name: Authentik
+          group: external
+          url: "https://idm.exmaple.com/"
+          interval: 1m
+          conditions:
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 720h"
+        - name: Bitwarden
+          group: external
+          url: "https://bitwarden.exmaple.com/"
+          interval: 1m
+          conditions:
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 720h"
+        - name: Forgejo
+          group: external
+          url: "https://git.exmaple.com/"
+          interval: 1m
+          conditions:
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 720h"
+        - name: Gokapi
+          group: external
+          url: "https://fileshare.exmaple.com/admin"
+          interval: 1m
+          conditions:
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 720h"
+        - name: Jellyfin
+          group: external
+          url: "https://media.exmaple.com/"
+          interval: 1m
+          conditions:
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 720h"
+        - name: Jellyseerr
+          group: external
+          url: "https://jellyseerr.exmaple.com/"
+          interval: 1m
+          conditions:
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 720h"
+        - name: Kavita
+          group: external
+          url: "https://kavita.exmaple.com/"
+          interval: 1m
+          conditions:
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 720h"
+        - name: Nextcloud
+          group: external
+          url: "https://cloud.exmaple.com/"
+          interval: 1m
+          conditions:
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 720h"
+        - name: Mailcow Web
+          group: external
+          url: "https://mail.exmaple.com/"
+          interval: 1m
+          conditions:
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 720h"                        
+        - name: S3
+          group: internal
+          url: "https://s3.int.exmaple.com/"
+          interval: 1m
+          conditions:
+            - "[STATUS] == 403"
+            - "[CERTIFICATE_EXPIRATION] > 720h"            
+        - name: HomeAssistant
+          group: internal
+          url: "https://hass.int.exmaple.com:8123/"
+          interval: 1m
+          conditions:
+            - "[STATUS] == 200"
+            - "[CERTIFICATE_EXPIRATION] > 720h"               
+        - name: Internal DNS
+          url: "10.50.0.5"
+          interval: 5m
+          group: internal
+          dns:
+            query-name: "lb.k8s.exmaple.com"
+            query-type: "A"
+          conditions:
+            - "[BODY] == pat(10.50.1.1)"
+            - "[DNS_RCODE] == NOERROR"    
+        - name: pve1
+          url: "icmp://10.50.0.11"
+          group: internal
+          interval: 1m
+          conditions:
+            - "[CONNECTED] == true"
+        - name: pve2
+          url: "icmp://10.50.0.12"
+          group: internal
+          interval: 1m
+          conditions:
+            - "[CONNECTED] == true"
+        - name: pve4
+          url: "icmp://10.50.0.14"
+          group: internal
+          interval: 1m
+          conditions:
+            - "[CONNECTED] == true"                        
+        - name: Mailcow IMAPS
+          url: "tls://mail.exmaple.com:993"
+          group: external
+          interval: 30m
+          client:
+            timeout: 5s
+          conditions:
+            - "[CONNECTED] == true"
+            - "[CERTIFICATE_EXPIRATION] > 720h"

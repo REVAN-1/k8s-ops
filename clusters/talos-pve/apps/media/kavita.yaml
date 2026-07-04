@@ -28,6 +28,13 @@ spec:
         strategy: Recreate
         annotations:
           reloader.stakater.com/auto: "false"
+        pod:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            fsGroupChangePolicy: OnRootMismatch
         containers:
           app: 
             image:
@@ -35,6 +42,22 @@ spec:
               tag: "0.9.0"
             env:
               TZ: Europe/Berlin
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
+            securityContext:
+              runAsNonRoot: true
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              seccompProfile:
+                type: RuntimeDefault
+              capabilities:
+                drop:
+                  - ALL
 
     service:
       app:
@@ -50,7 +73,6 @@ spec:
           kavita:
             app:
               - path: /kavita/config            
-      # Configure an NFS mount to store backups on
       books:
         type: nfs
         server: 192.168.178.118

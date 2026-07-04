@@ -4,7 +4,7 @@ metadata:
   name: immich-postgresql
   namespace: immich
 spec:
-  imageName: ghcr.io/tensorchord/cloudnative-pgvecto.rs:16.5-v0.3.0
+  imageName: ghcr.io/tensorchord/cloudnative-vectorchord:16-0.3.0
   instances: 3
   startDelay: 30
   stopDelay: 100
@@ -23,7 +23,7 @@ spec:
     parameters:
       max_connections: "200"
     shared_preload_libraries:
-      - "vectors.so"
+      - "vchord.so"
   resources:
     requests:
       memory: "1024Mi"
@@ -47,13 +47,10 @@ spec:
       secret:
         name: immich-postgresql
       postInitSQL:
-        - ALTER SYSTEM SET search_path TO "$user", public, vectors;
-        - SET search_path TO "$user", public, vectors;      
-        - CREATE EXTENSION IF NOT EXISTS "vectors";
-        - CREATE EXTENSION IF NOT EXISTS "cube" CASCADE;
-        - CREATE EXTENSION IF NOT EXISTS "earthdistance" CASCADE;
-        - ALTER SCHEMA vectors OWNER TO "immich";
-        - GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA vectors TO "immich";
+        - CREATE EXTENSION IF NOT EXISTS vector;
+        - CREATE EXTENSION IF NOT EXISTS vchord CASCADE;
+        - CREATE EXTENSION IF NOT EXISTS cube CASCADE;
+        - CREATE EXTENSION IF NOT EXISTS earthdistance CASCADE;
         - GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "immich";
   storage:
     size: 10Gi

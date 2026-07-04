@@ -1,0 +1,177 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: nextcloud-app-restrict
+  namespace: nextcloud
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: nextcloud
+      app.kubernetes.io/instance: nextcloud
+
+  ingress:
+    - fromEntities:
+        - ingress
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            cnpg.io/cluster: nextcloud-db
+            role: primary
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: redis
+            app.kubernetes.io/instance: nextcloud
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP            
+
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*"
+
+    - toFQDNs:
+        - matchName: mail.exmaple.com
+      toPorts:
+        - ports:
+            - port: "465"
+              protocol: TCP
+
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: nextcloud-db-ingress-restrict
+  namespace: nextcloud
+spec:
+  endpointSelector:
+    matchLabels:
+      cnpg.io/cluster: nextcloud-db
+
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: nextcloud
+            app.kubernetes.io/instance: nextcloud
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+
+    - fromEndpoints:
+        - matchLabels:
+            cnpg.io/cluster: nextcloud-db
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+            - port: "8000"
+              protocol: TCP
+
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+            - port: "8000"
+              protocol: TCP
+
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: nextcloud-db-metrics
+  namespace: nextcloud
+spec:
+  endpointSelector:
+    matchLabels:
+      cnpg.io/cluster: nextcloud-db
+
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: prometheus
+      toPorts:
+        - ports:
+            - port: "9187"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: euro-office-app-restrict
+  namespace: nextcloud
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/instance: euro-office
+      app.kubernetes.io/controller: euro-office
+
+  ingress:
+    - fromEntities:
+        - world
+        - cluster
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/instance: euro-office
+            app.kubernetes.io/controller: rabbitmq
+      toPorts:
+        - ports:
+            - port: "5672"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

@@ -1,0 +1,86 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: samba-consume
+  namespace: paperless
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.0.1"
+
+  values:
+    controllers:
+      samba:
+        strategy: Recreate
+        annotations:
+          reloader.stakater.com/auto: "true"
+
+        containers:
+          app:
+            image:
+              repository: ghcr.io/servercontainers/samba
+              tag: smbd-only-latest
+
+            envFrom:
+              - secretRef:
+                  name: samba-paperless-secret
+
+            env:
+              TZ: Europe/Berlin
+              UID_scan: "1000"
+              SAMBA_CONF_WORKGROUP: "WORKGROUP"
+              SAMBA_CONF_SERVER_STRING: "Paperless Consume"
+              SAMBA_GLOBAL_STANZA: >-
+                server min protocol = SMB2;
+                server max protocol = SMB3;
+                ntlm auth = ntlmv2-only;
+                disable netbios = yes;
+                smb ports = 445;
+                map to guest = never
+              SAMBA_VOLUME_CONFIG_consume: >-
+                [consume];
+                path = /shares/consume;
+                valid users = scan;
+                guest ok = no;
+                read only = no;
+                writable = yes;
+                browseable = yes;
+                create mask = 0660;
+                directory mask = 0770;
+                force user = scan
+
+    service:
+      app:
+        controller: samba
+        type: LoadBalancer
+        loadBalancerIP: 10.50.1.5
+        ports:
+          smb:
+            port: 445
+            targetPort: 445
+            protocol: TCP
+
+    persistence:
+      storage:
+        enabled: true
+        type: persistentVolumeClaim
+        existingClaim: paperless-data
+        globalMounts:
+          - path: /shares/consume
+            subPath: consume

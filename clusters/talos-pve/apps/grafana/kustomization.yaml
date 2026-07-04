@@ -12,3 +12,4 @@ resources:
   - secrets.yaml
   - mktxp.yaml
   - prometheus.yaml
+  - gatus.yaml

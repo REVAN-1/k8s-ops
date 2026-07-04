@@ -32,7 +32,7 @@ spec:
           actual: 
             image:
               repository: docker.io/actualbudget/actual-server
-              tag: "26.6.0-alpine"   
+              tag: "26.7.0-alpine@sha256:1449173e2221eb9387da866723808a1fa32a3e92e5cca5df65dc90a532c81ac8"   
             env:
               ACTUAL_HTTPS_KEY: "/data/tls.key"
               ACTUAL_HTTPS_CERT: "/data/tls.crt"

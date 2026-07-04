@@ -111,8 +111,9 @@ metadata:
   name: immich
   namespace: flux-system
 spec:
-  interval: 1h0m0s
-  url:  https://immich-app.github.io/immich-charts
+  type: oci
+  interval: 10m
+  url: oci://ghcr.io/immich-app/immich-charts
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
@@ -302,3 +303,12 @@ metadata:
 spec:
   interval: 1h0m0s
   url: https://helm.cilium.io/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: twin
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://twin.github.io/helm-charts

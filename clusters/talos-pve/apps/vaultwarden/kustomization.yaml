@@ -7,3 +7,4 @@ resources:
   - secrets.yaml
   - backup.yaml
   - db.yaml
+  - network-policies.yaml

@@ -54,7 +54,7 @@ spec:
             app:
               - path: /config  
 
-      download:
+      download-slskd:
         existingClaim: slskd-download
         advancedMounts:
           lidarr:
@@ -62,6 +62,13 @@ spec:
               - path: /downloads
             portupdater:
               - path: /downloads
+
+      download-sabnzbd:
+        type: nfs
+        server: 192.168.178.118
+        path: /mnt/zfs-pool/media/downloads/sabnzb/music
+        globalMounts:
+          - path: /downloads/music
 
       data:
         type: nfs

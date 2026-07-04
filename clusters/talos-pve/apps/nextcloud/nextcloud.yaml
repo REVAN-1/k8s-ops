@@ -16,7 +16,7 @@ spec:
         kind: HelmRepository
         name: nextcloud
         namespace: flux-system
-      version: "9.1.2"
+      version: "9.2.0"
   values:
     replicaCount: 3
     affinity:
@@ -33,37 +33,33 @@ spec:
                   values:
                     - app
             topologyKey: kubernetes.io/hostname
+
+    podSecurityContext:
+      fsGroup: 33
+      fsGroupChangePolicy: OnRootMismatch
+      seccompProfile:
+        type: RuntimeDefault
+
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false
+      capabilities:
+        drop:
+          - ALL
+
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        memory: 2Gi
+
     ingress:
       enabled: true
       className: cilium
       annotations:
-#        nginx.ingress.kubernetes.io/proxy-body-size: "4G"
         kubernetes.io/tls-acme: "false"           
-#        nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-#        nginx.ingress.kubernetes.io/server-snippet: |-
-#          server_tokens off;
-#          proxy_hide_header X-Powered-By;
-#          rewrite ^/.well‑known/webfinger /index.php/.well‑known/webfinger last;
-#          rewrite ^/.well‑known/nodeinfo /index.php/.well‑known/nodeinfo last;
-#          rewrite ^/.well‑known/host-meta /public.php?service=host-meta last;
-#          rewrite ^/.well‑known/host-meta.json /public.php?service=host-meta‑json;
-#          location = /.well‑known/carddav {
-#            return 301 $scheme://$host/remote.php/dav;
-#          }
-#          location = /.well‑known/caldav {
-#            return 301 $scheme://$host/remote.php/dav;
-#          }
-#          location = /robots.txt {
-#            allow all;
-#            log_not_found off;
-#            access_log off;
-#          }
-#          location ~ ^/(?:build|tests|config|lib|3rdparty|templates|data)/ {
-#            deny all;
-#          }
-#          location ~ ^/(?:autotest|occ|issue|indie|db_|console) {
-#            deny all;
-#          }
+
 
       tls:
         - secretName: external-tls
@@ -87,9 +83,7 @@ spec:
       trustedDomains: cloud.exmaple.com
       mail:
         enabled: true
-        # the user we send email as
         fromAddress: user
-        # the domain we send email from
         domain: cloud@exmaple.com
         smtp:
           secure: ssl
@@ -124,11 +118,8 @@ spec:
 
     externalDatabase:
       enabled: true
-      ## Supported database engines: mysql or postgresql
       type: postgresql
-      ## Database host. You can optionally include a colon delimited port like "myhost:1234"
       host: "nextcloud-db-rw"
-      ## Database user
       database: nextcloud  
       existingSecret:
         enabled: true
@@ -153,7 +144,6 @@ spec:
           enabled: false
 
     persistence:
-      # Nextcloud Data (/var/www/html)
       enabled: true
       storageClass: csi-cephfs-sc
       size: 5Gi

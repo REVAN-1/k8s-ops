@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: prometheus
         namespace: flux-system
-      version: "29.10.1"
+      version: "29.14.0"
   values:
     serverFiles:
       prometheus.yml:
@@ -43,11 +43,6 @@ spec:
         - job_name: 'load-balancer-metrics'
           static_configs:
             - targets: ['10.50.0.15:8405']
-        - job_name: 'crowdsec_mailcow'
-          static_configs:
-            - targets: ['10.10.10.3:6060']
-              labels:
-                machine: 'mailcow'
         - job_name: 'garage'
           authorization:
             type: Bearer
@@ -63,6 +58,24 @@ spec:
                 - volsync-metrics.volsync-system.svc.cluster.local:8443
           tls_config:
             insecure_skip_verify: true
+        - job_name: 'gatus'
+          metrics_path: /metrics
+          static_configs:
+            - targets: 
+                - gatus:80
+        - job_name: 'scrunity_nas'
+          metrics_path: /api/metrics
+          scheme: https
+          static_configs:
+            - targets: 
+                - 'scrutiny.int.exmaple.com'
+        - job_name: 'scrunity_vault'
+          metrics_path: /api/metrics
+          scheme: https
+          static_configs:
+            - targets: 
+                - 'vault.int.exmaple.com'                
+
 
     server:
       extraSecretMounts:
@@ -74,7 +87,7 @@ spec:
         enabled: true
         accessModes:
           - ReadWriteOnce
-        size: 15Gi
+        size: 25Gi
         storageClass: csi-rbd-sc
       resources:
         limits:

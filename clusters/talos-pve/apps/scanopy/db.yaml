@@ -1,8 +1,8 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: zabbix-db
-  namespace: zabbix
+  name: scanopy-db
+  namespace: scanopy
 spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:17
   instances: 1
@@ -13,19 +13,19 @@ spec:
     services:
       disabledDefaultServices: ["ro", "r"]
     roles:
-      - name: zabbix
+      - name: scanopy
         superuser: true
         login: true
         passwordSecret:
-          name: zabbix-db-secret
+          name: scanopy-db-secret
   bootstrap:
     initdb:
-      database: zabbix
-      owner: zabbix
+      database: scanopy
+      owner: scanopy
       secret:
-        name: zabbix-db-secret
+        name: scanopy-db-secret
   storage:
-    size: 15Gi
+    size: 5Gi
     storageClass: csi-rbd-sc
 
   plugins:
@@ -34,36 +34,17 @@ spec:
       parameters:
         barmanObjectName: garage
 
-  postgresql:
-    parameters:
-      max_connections: "100"
-      shared_buffers: "1GB"
-      effective_cache_size: "3GB"
-      maintenance_work_mem: "256MB"
-      checkpoint_completion_target: "0.9"
-      wal_buffers: "16MB"
-      default_statistics_target: "100"
-      random_page_cost: "1.1"
-      effective_io_concurrency: "200"
-      work_mem: "5242kB"
-      huge_pages: "off"
-      min_wal_size: "1GB"
-      max_wal_size: "4GB"
-      max_worker_processes: "4"
-      max_parallel_workers_per_gather: "2"
-      max_parallel_workers: "4"
-      max_parallel_maintenance_workers: "2"
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup
 metadata:
-  name: backup-zabbix-postgresql
-  namespace: zabbix
+  name: backup-scanopy-postgresql
+  namespace: scanopy
 spec:
   schedule: "0 0 18 * * *"
   backupOwnerReference: self
   cluster:
-    name: zabbix-db
+    name: scanopy-db
   method: plugin
   pluginConfiguration:
     name: barman-cloud.cloudnative-pg.io
@@ -72,7 +53,7 @@ apiVersion: barmancloud.cnpg.io/v1
 kind: ObjectStore
 metadata:
   name: garage
-  namespace: zabbix
+  namespace: scanopy
 spec:
   configuration:
     destinationPath: s3://k8s-postgresql/
@@ -95,17 +76,17 @@ spec:
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: zabbix-db
-  namespace: zabbix
+  name: scanopy-db
+  namespace: scanopy
   labels:
     release: kube-prometheus-stack
 spec:
   namespaceSelector:
     matchNames:
-      - zabbix
+      - scanopy
   selector:
     matchLabels:
-      cnpg.io/cluster: zabbix-db
+      cnpg.io/cluster: scanopy-db
   podMetricsEndpoints:
     - port: metrics
       path: /metrics

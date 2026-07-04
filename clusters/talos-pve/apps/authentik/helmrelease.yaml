@@ -25,28 +25,29 @@ spec:
   valuesFrom:
     - kind: Secret
       name: authentik-secrets
-      # zieht den kompletten YAML-Block aus .data["values.yaml"]
       valuesKey: values.yaml
   values:    
+    global:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+
+      affinity:
+        podAntiAffinity: hard
+
     authentik:
         email:
-          # -- SMTP Server emails are sent from, fully optional
           host: "mail.exmaple.com"
-          # -- SMTP server port
           port: 465
-          # -- SMTP credentials, when left empty, no authentication will be done
           username: "idm@exmaple.com"
-          # -- Enable either use_tls or use_ssl, they can't be enabled at the same time.
           use_tls: false
-          # -- Enable either use_tls or use_ssl, they can't be enabled at the same time.
           use_ssl: true
-          # -- Connection timeout
           timeout: 30
-          # -- Email from address, can either be in the format "foo@bar.baz" or "authentik <foo@bar.baz>"
           from: "idm@exmaple.com"
 
-        # This sends anonymous usage-data, stack traces on errors and
-        # performance data to sentry.io, and is fully opt-in
         error_reporting:
             enabled: true
         postgresql:
@@ -58,7 +59,6 @@ spec:
     server:
       replicas: 2
       autoscaling:
-        # -- Enable Horizontal Pod Autoscaler ([HPA]) for the authentik server
         enabled: false
       env:
       - name: AUTHENTIK_DEFAULT_USER_CHANGE_EMAIL
@@ -68,7 +68,6 @@ spec:
       - name: AUTHENTIK_DEFAULT_USER_CHANGE_USERNAME
         value: "true"
       ingress:
-          # Specify kubernetes ingress controller class name
           ingressClassName: cilium
           enabled: true
           annotations:
@@ -79,14 +78,47 @@ spec:
             - secretName: external-tls
               hosts:
                 - idm.exmaple.com
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+
+      containerSecurityContext:
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        seccompProfile:
+          type: RuntimeDefault
+        capabilities:
+          drop:
+            - ALL
 
     worker: 
       replicas: 2
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+      containerSecurityContext:
+        runAsNonRoot: true
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        seccompProfile:
+          type: RuntimeDefault
+        capabilities:
+          drop:
+            - ALL
 
     postgresql:
         enabled: false
 
-    gepip:
+    geopip:
       enabled: true
       existingSecret:
         secretName: "geoip-creds"

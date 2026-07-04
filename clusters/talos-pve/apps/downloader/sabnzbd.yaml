@@ -32,7 +32,7 @@ spec:
           app: 
             image:
               repository: lscr.io/linuxserver/sabnzbd
-              tag: 5.0.4@sha256:c2f1826a3d231b9506554a60447e763157fd8ba4f600a4a864d6d0ddae00a0aa
+              tag: 5.0.4@sha256:30cc2eb9e1c8b7c5bb90dbf3c7abb0e66643c21c3710e273a82d2f36239e176d
               pullPolicy: Always
             env:
               TZ: Europe/Berlin
@@ -131,20 +131,12 @@ spec:
             app:
               - path: /incomplete-downloads  
 
-      serien:
+      downloads:
         type: nfs
         server: 192.168.178.118
-        path: /mnt/zfs-pool/media/downloads/sabnzb/serien
+        path: /mnt/zfs-pool/media/downloads/sabnzb
         globalMounts:
-          - path: /serien
-
-      filme:
-        type: nfs
-        server: 192.168.178.118
-        path: /mnt/zfs-pool/media/downloads/sabnzb/filme
-        globalMounts:
-          - path: /filme
-
+          - path: /downloads
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

@@ -28,13 +28,37 @@ spec:
         strategy: Recreate
         annotations:
           reloader.stakater.com/auto: "false"
+        pod:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            fsGroupChangePolicy: OnRootMismatch
         containers:
           app: 
             image:
               repository: ghcr.io/seerr-team/seerr
-              tag: "latest"
+              tag: "v3.3"
             env:
               TZ: Europe/Berlin
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+            securityContext:
+              runAsNonRoot: true
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              seccompProfile:
+                type: RuntimeDefault
+              capabilities:
+                drop:
+                  - ALL
+
 
     service:
       app:

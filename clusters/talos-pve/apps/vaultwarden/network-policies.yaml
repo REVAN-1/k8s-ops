@@ -1,0 +1,126 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: vaultwarden-app-restrict
+  namespace: vaultwarden
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: vaultwarden
+      app.kubernetes.io/instance: vaultwarden
+
+  ingress:
+    # only ingress can reach vaultwarden-pod
+    - fromEntities:
+        - ingress
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+
+  egress:
+    # Vaultwarden to postgresql
+    - toEndpoints:
+        - matchLabels:
+            cnpg.io/cluster: vaultwarden-db
+            role: primary
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+
+    # DNS
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchPattern: "*"
+
+    # SMTP
+    - toFQDNs:
+        - matchName: mail.exmaple.com
+      toPorts:
+        - ports:
+            - port: "465"
+              protocol: TCP
+
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: vaultwarden-db-ingress-restrict
+  namespace: vaultwarden
+spec:
+  endpointSelector:
+    matchLabels:
+      cnpg.io/cluster: vaultwarden-db
+
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: vaultwarden
+            app.kubernetes.io/instance: vaultwarden
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+
+    - fromEndpoints:
+        - matchLabels:
+            cnpg.io/cluster: vaultwarden-db
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+            - port: "8000"
+              protocol: TCP
+
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+            - port: "8000"
+              protocol: TCP
+
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: vaultwarden-db-metrics
+  namespace: vaultwarden
+spec:
+  endpointSelector:
+    matchLabels:
+      cnpg.io/cluster: vaultwarden-db
+
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: prometheus
+      toPorts:
+        - ports:
+            - port: "9187"
+              protocol: TCP

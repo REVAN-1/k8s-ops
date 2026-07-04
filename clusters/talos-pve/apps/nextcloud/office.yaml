@@ -32,7 +32,7 @@ spec:
           euro-office: 
             image:
               repository: ghcr.io/euro-office/documentserver
-              tag: "v9.3.1"
+              tag: "v9.3.2@sha256:5a1a8b7083856b309f09a5b06aa96f80182cbdfccddcae6c082ecf7a2b3cbf2b"
               pullPolicy: IfNotPresent
             env:
               TZ: Europe/Berlin
@@ -45,6 +45,14 @@ spec:
             envFrom:
               - secretRef:
                   name: euro-office-env
+            resources:
+              requests:
+                cpu: 50m
+                memory: 512Mi
+              limits:
+                cpu: 500m
+                memory: 2Gi
+
       rabbitmq:
         containers:
           rabbitmq:
@@ -55,33 +63,17 @@ spec:
     service:
       euro-office:
         controller: euro-office
+        type: LoadBalancer
+        annotations:
+          lbipam.cilium.io/ips: 10.50.1.7
         ports:
           http:
             port: 80
-          https:
-            port: 443
+            targetPort: 80
+            protocol: TCP
       rabbitmq:
         controller: rabbitmq
         forceRename: rabbitmq
         ports:
           tcp:
             port: 5672
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: euro-office-lb
-  namespace: nextcloud
-  labels:
-    app: euro-office
-spec:
-  type: LoadBalancer
-  loadBalancerIP: 10.50.1.7
-  ports:
-  - port: 80
-    targetPort: 80
-    protocol: TCP
-    name: http
-  selector:
-    app.kubernetes.io/name: euro-office
-

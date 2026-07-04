@@ -5,3 +5,4 @@ resources:
   - helmrelease.yaml
   - secrets.yaml
   - db.yaml
+  - network-policies.yaml

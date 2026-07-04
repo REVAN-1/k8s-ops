@@ -66,7 +66,7 @@ spec:
         server: 192.168.178.118
         path: /mnt/zfs-pool/media/downloads/sabnzb/filme
         globalMounts:
-          - path: /filme
+          - path: /downloads/filme
 
     ingress:
       app:

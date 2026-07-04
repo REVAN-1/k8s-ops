@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: immich
         namespace: flux-system
-      version: "0.12.0"
+      version: "0.13.1"
   valuesFrom:
     - kind: Secret
       name: immich-postgresql
@@ -34,7 +34,7 @@ spec:
         containers:
           main:
             image:
-              tag: v2.7.5
+              tag: v3.0.1
             env:
               DB_HOSTNAME: "immich-postgresql-rw"
               DB_USERNAME: "immich"
@@ -65,8 +65,8 @@ spec:
                   cpu: "250m"
                   memory: "512Mi"
                 limits:
-                  cpu: "1"
-                  memory: "1Gi"
+                  cpu: "2"
+                  memory: "2Gi"
                   gpu.intel.com/i915: "1"
       ingress:
         main:
@@ -80,7 +80,7 @@ spec:
             main:
               image:
                 repository: ghcr.io/immich-app/immich-machine-learning
-                tag: v2.7.5
+                tag: v3.0.1-openvino
               env:
                 TRANSFORMERS_CACHE: /cache
                 HF_XET_CACHE: /cache/huggingface-xet
@@ -91,6 +91,7 @@ spec:
                 requests:
                   cpu: "250m"
                   memory: "512Mi"
+                  gpu.intel.com/i915: "1"
                 limits:
                   cpu: "2"
                   memory: "4Gi"
