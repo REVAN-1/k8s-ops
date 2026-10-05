@@ -23,9 +23,9 @@ spec:
       chart: loki
       sourceRef:
         kind: HelmRepository
-        name: grafana
+        name: grafana-community
         namespace: flux-system
-      version: "7.0.0"
+      version: "18.5.0"
   values:
     deploymentMode: SimpleScalable
     loki:
@@ -78,7 +78,7 @@ spec:
             bucketnames: loki
 
     chunksCache:
-      allocatedMemory: 2048
+      allocatedMemory: 1024
 
     resultsCache:
       allocatedMemory: 1024
@@ -88,6 +88,13 @@ spec:
           
     gateway:
       enabled: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
       ingress:
         enabled: true
         ingressClassName: "cilium"
@@ -125,19 +132,40 @@ spec:
       replicas: 0
 
     backend:
-      replicas: 2
+      replicas: 1
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
       persistence:
         size: 5Gi
         enableStatefulSetAutoDeletePVC: true
         storageClass: csi-rbd-sc
     read:
       replicas: 2
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
       persistence:
         size: 15Gi
         enableStatefulSetAutoDeletePVC: true
         storageClass: csi-rbd-sc
     write:
       replicas: 2
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
       persistence:
         size: 25Gi
         enableStatefulSetAutoDeletePVC: true

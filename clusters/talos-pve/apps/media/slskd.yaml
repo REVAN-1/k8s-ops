@@ -21,18 +21,22 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       slskd:
         strategy: Recreate
         annotations:
           reloader.stakater.com/auto: "false"
+        pod:
+          securityContext:
+            fsGroup: 0
+            fsGroupChangePolicy: OnRootMismatch
         containers:
           app: 
             image:
               repository: ghcr.io/slskd/slskd
-              tag: "0.25.1"
+              tag: "0.26.0@sha256:ecd4026d4f8fb504e2cc55323efa2c1f5b56d20d3686b018249cc36b48ea17a6"
             command:
               - /bin/sh
             args:
@@ -78,9 +82,18 @@ spec:
             resources:
               requests:
                 cpu: 100m
+                memory: 256Mi
               limits:
                 cpu: 200m
                 memory: 512Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              seccompProfile:
+                type: RuntimeDefault
+              capabilities:
+                drop:
+                  - ALL
           gluetun:
             image:
               repository: ghcr.io/qdm12/gluetun
@@ -120,6 +133,9 @@ spec:
                   timeoutSeconds: 10
                   failureThreshold: 3
             securityContext:
+              runAsUser: 0
+              runAsGroup: 0
+              runAsNonRoot: false
               capabilities:
                 add:
                   - NET_ADMIN
@@ -127,6 +143,7 @@ spec:
             resources:
               requests:
                 cpu: 100m
+                memory: 256Mi
               limits:
                 cpu: 200m
                 memory: 512Mi

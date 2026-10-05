@@ -13,7 +13,7 @@ spec:
     cleanupOnFail: true
     remediation:
       retries: 3
-      remediateLastFailure: true 
+      remediateLastFailure: true
   chart:
     spec:
       chart: immich
@@ -21,39 +21,33 @@ spec:
         kind: HelmRepository
         name: immich
         namespace: flux-system
-      version: "0.13.1"
+      version: "0.13.2"
   valuesFrom:
     - kind: Secret
       name: immich-postgresql
       valuesKey: password
       targetPath: controllers.main.containers.main.env.DB_PASSWORD
   values:
-
     controllers:
       main:
         containers:
           main:
             image:
-              tag: v3.0.1
+              tag: v3.2.4 # {"$imagepolicy": "flux-system:immich-server:tag"}
             env:
               DB_HOSTNAME: "immich-postgresql-rw"
               DB_USERNAME: "immich"
               DB_DATABASE_NAME: "immich"
-
-
+              REDIS_HOSTNAME: "immich-session-cache"
+              REDIS_PORT: "6379"
     immich:
       metrics:
         enabled: false
       persistence:
         library:
           existingClaim: immich-data
-
     valkey:
-      enabled: true
-      persistence:
-        data:
-          enabled: false
-
+      enabled: false
     server:
       enabled: true
       controllers:
@@ -71,8 +65,7 @@ spec:
       ingress:
         main:
           enabled: false
-
-    machine-learning:    
+    machine-learning:
       enabled: true
       controllers:
         main:
@@ -80,14 +73,14 @@ spec:
             main:
               image:
                 repository: ghcr.io/immich-app/immich-machine-learning
-                tag: v3.0.1-openvino
+                tag: v3.2.4-openvino # {"$imagepolicy": "flux-system:immich-machine-learning-openvino:tag"}
               env:
                 TRANSFORMERS_CACHE: /cache
                 HF_XET_CACHE: /cache/huggingface-xet
                 MPLCONFIGDIR: /cache/matplotlib-config
                 MACHINE_LEARNING_MODEL_TTL: 0
                 MACHINE_LEARNING_CACHE_FOLDER: /cache
-              resources:  
+              resources:
                 requests:
                   cpu: "250m"
                   memory: "512Mi"
@@ -131,7 +124,7 @@ spec:
                     timeoutSeconds: 5
                     failureThreshold: 90
       persistence:
-        cache: 
+        cache:
           enabled: true
           size: 25Gi
           accessMode: ReadWriteMany
@@ -163,31 +156,6 @@ spec:
     kind: Deployment
     name: immich-server
 ---
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: immich-machine-learning
-  namespace: immich
-spec:
-  minReplicas: 1
-  maxReplicas: 2
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 30
-    scaleDown:
-      stabilizationWindowSeconds: 60
-  metrics:
-    - resource:
-        name: cpu
-        target:
-          averageUtilization: 50
-          type: Utilization
-      type: Resource
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: immich-machine-learning
----
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -199,4 +167,4 @@ spec:
   storageClassName: csi-cephfs-sc
   resources:
     requests:
-      storage: 500Gi 
+      storage: 500Gi

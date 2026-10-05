@@ -29,7 +29,7 @@ spec:
       memory: "1024Mi"
       cpu: 100m
     limits:
-      memory: "2048Mi"
+      memory: "1024Mi"
       cpu: 500m
   managed:
     services:
@@ -54,6 +54,10 @@ spec:
         - GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "immich";
   storage:
     size: 10Gi
+    storageClass: csi-rbd-sc
+
+  walStorage:
+    size: 20Gi
     storageClass: csi-rbd-sc
 
   plugins:

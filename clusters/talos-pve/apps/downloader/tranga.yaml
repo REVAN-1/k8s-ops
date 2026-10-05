@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       tranga-website:
@@ -37,6 +37,11 @@ spec:
             env:
               TZ: Europe/Berlin
               API_URL: http://tranga-tranga-api:6531
+            resources:
+              requests:
+                memory: 32Mi
+              limits:
+                memory: 128Mi
       tranga-api:
         strategy: Recreate
         annotations:
@@ -60,7 +65,7 @@ spec:
                 memory: "128Mi"  
               limits:
                 cpu: "500m"     
-                memory: "1024Mi"  
+                memory: "768Mi"  
       flaresolverr:
         strategy: Recreate
         replicas: 3
@@ -74,6 +79,13 @@ spec:
             env:
               TZ: Europe/Berlin
               LOG_LEVEL: info
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
 
 
     service:

@@ -18,13 +18,18 @@ spec:
   chart:
     spec:
       chart: zot
-      version: "0.1.119"
+      version: "0.1.125"
       sourceRef:
         kind: HelmRepository
         name: project-zot
         namespace: flux-system
   values:
-    replicaCount: 1
+    replicaCount: 3
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 1
+        maxSurge: 1
     affinity:
       podAntiAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
@@ -47,14 +52,20 @@ spec:
       
     mountConfig: true
     mountSecret: true
-    persistence: true
-    pvc:
-      create: true
-      name: zot-data
-      storage: 50Gi
-      storageClassName: csi-rbd-sc
-      accessModes:
-        - ReadWriteOnce
+    persistence: false
+
+    env:
+      - name: AWS_ACCESS_KEY_ID
+        valueFrom:
+          secretKeyRef:
+            name: zot-s3-credentials
+            key: AWS_ACCESS_KEY_ID
+
+      - name: AWS_SECRET_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: zot-s3-credentials
+            key: AWS_SECRET_ACCESS_KEY
 
 
     extraVolumes:
@@ -80,29 +91,53 @@ spec:
     resources:
       requests:
         cpu: 500m
-        memory: 1Gi
+        memory: 128Mi
       limits:
         cpu: 1000m
-        memory: 2Gi
+        memory: 512Mi
 
     configFiles:
       config.json: |
         {
           "distSpecVersion": "1.1.0",
           "storage": {
-            "rootDirectory": "/var/lib/registry",
-            "dedupe": true,
+            "rootDirectory": "/tmp/zot",
+            "dedupe": false,
             "gc": true,
-            "commit": false
+            "gcInterval": "24h",
+            "commit": false,
+            "remoteCache": true,
+            "storageDriver": {
+              "name": "s3",
+              "region": "local",
+              "regionendpoint": "10.50.0.30",
+              "bucket": "registry",
+              "rootdirectory": "/zot",
+              "forcepathstyle": true,
+              "secure": false,
+              "skipverify": false
+            },
+            "cacheDriver": {
+              "name": "redis",
+              "url": "redis://zot-session-cache.zot.svc.cluster.local:6379",
+              "keyprefix": "zot-cache"
+            }
           },
           "http": {
             "address": "0.0.0.0",
             "port": "5000",
             "realm": "zot",
             "compat": ["docker2s2"],
+            "readTimeout": "600s",
+            "writeTimeout": "600s",
             "auth": {
               "htpasswd": {
                 "path": "/etc/zot/auth/htpasswd"
+              },
+              "sessionDriver": {
+                "name": "redis",
+                "url": "redis://zot-session-cache.zot.svc.cluster.local:6379",
+                "keyprefix": "zot-session"
               }
             },
             "accessControl": {
@@ -123,14 +158,7 @@ spec:
           },
           "extensions": {
             "search": {
-              "enable": true,
-              "cve": {
-                "updateInterval": "12h",
-                "trivy": {
-                  "dbRepository": "ghcr.io/aquasecurity/trivy-db",
-                  "javaDBRepository": "ghcr.io/aquasecurity/trivy-java-db"
-                }
-              }
+              "enable": true
             },
             "ui": {
               "enable": true

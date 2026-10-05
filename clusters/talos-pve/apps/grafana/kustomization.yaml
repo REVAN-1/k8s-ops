@@ -7,9 +7,9 @@ resources:
   - alloy.yaml
   - grafana.yaml
   - influxdb1.yaml
-  - influxdb2.yaml
-  - influxdb3.yaml
   - secrets.yaml
   - mktxp.yaml
   - prometheus.yaml
   - gatus.yaml
+  - telegraf.yaml
+  - evcc-aggregate.yaml

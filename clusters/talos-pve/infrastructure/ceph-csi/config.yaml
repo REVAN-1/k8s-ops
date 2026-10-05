@@ -1,0 +1,16 @@
+apiVersion: csi.ceph.io/v1
+kind: ClientProfile
+metadata:
+  name: 31095d64-7bff-11f0-8065-d9f210f0c539
+  namespace: ceph-csi-operator-system
+spec:
+  cephConnectionRef:
+    name: talos-ceph
+
+  cephFs:
+    subVolumeGroup: csi
+    kernelMountOptions:
+      ms_mode: prefer-secure
+
+  rbd:
+    radosNamespace: ""

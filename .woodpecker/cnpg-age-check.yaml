@@ -1,0 +1,260 @@
+when:
+  - event: cron
+    cron: daily-checks
+  - event: manual
+
+steps:
+  - name: check-cnpg-backup-age
+    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+
+    environment:
+      KUBECTL_VERSION: "v1.36.2"
+      MAX_AGE_HOURS: "26"
+
+    backend_options:
+      kubernetes:
+        serviceAccountName: cnpg-backup-observer
+
+    commands:
+      - |
+        set -eu
+
+        apk add --no-cache \
+          ca-certificates \
+          coreutils \
+          curl
+
+        SUMMARY="cnpg-backup-summary.txt"
+        FAILURES="cnpg-backup-failures.txt"
+
+        : > "$SUMMARY"
+        : > "$FAILURES"
+
+        case "$(uname -m)" in
+          x86_64)
+            KUBE_ARCH="amd64"
+            ;;
+          aarch64|arm64)
+            KUBE_ARCH="arm64"
+            ;;
+          *)
+            echo "FEHLER: Nicht unterstützte Architektur: $(uname -m)" \
+              | tee -a "$SUMMARY" "$FAILURES"
+            exit 1
+            ;;
+        esac
+
+        echo "Installiere kubectl $KUBECTL_VERSION für $KUBE_ARCH"
+
+        curl -fsSLo /tmp/kubectl \
+          "https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/$KUBE_ARCH/kubectl"
+
+        curl -fsSLo /tmp/kubectl.sha256 \
+          "https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/$KUBE_ARCH/kubectl.sha256"
+
+        printf '%s  %s\n' \
+          "$(cat /tmp/kubectl.sha256)" \
+          "/tmp/kubectl" \
+          | sha256sum -c -
+
+        install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+
+        #
+        # Exakt tabulatorgetrennte Listen erzeugen.
+        #
+        # Cluster:
+        # namespace<TAB>cluster-name
+        #
+        if ! kubectl get clusters.postgresql.cnpg.io \
+          --all-namespaces \
+          --output=go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\n"}}{{end}}' \
+          > /tmp/cnpg-clusters.tsv
+        then
+          echo "FEHLER: CloudNativePG-Cluster konnten nicht gelesen werden." \
+            | tee -a "$SUMMARY" "$FAILURES"
+          exit 1
+        fi
+
+        #
+        # Backups:
+        # namespace<TAB>cluster<TAB>backup-name<TAB>phase<TAB>stoppedAt
+        #
+        if ! kubectl get backups.postgresql.cnpg.io \
+          --all-namespaces \
+          --output=go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.spec.cluster.name}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{.status.phase}}{{"\t"}}{{.status.stoppedAt}}{{"\n"}}{{end}}' \
+          > /tmp/cnpg-backups.tsv
+        then
+          echo "FEHLER: CloudNativePG-Backups konnten nicht gelesen werden." \
+            | tee -a "$SUMMARY" "$FAILURES"
+          exit 1
+        fi
+
+        if [ ! -s /tmp/cnpg-clusters.tsv ]; then
+          echo "FEHLER: Keine CloudNativePG-Cluster gefunden." \
+            | tee -a "$SUMMARY" "$FAILURES"
+          exit 1
+        fi
+
+        NOW="$(date -u +%s)"
+        MAX_AGE_SECONDS="$((MAX_AGE_HOURS * 3600))"
+        TAB="$(printf '\t')"
+
+        FAILED=0
+        CHECKED=0
+
+        {
+          echo "CloudNativePG Backup Check"
+          echo "Zeitpunkt: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          echo "Maximales Alter: $MAX_AGE_HOURS Stunden"
+          echo
+        } | tee -a "$SUMMARY"
+
+        while IFS="$TAB" read -r NAMESPACE CLUSTER
+        do
+          [ -n "$NAMESPACE" ] || continue
+          [ -n "$CLUSTER" ] || continue
+
+          CHECKED="$((CHECKED + 1))"
+
+          RESOURCE="$NAMESPACE/$CLUSTER"
+          LATEST_EPOCH=0
+          LATEST_NAME=""
+          LATEST_TIME=""
+          INVALID_COMPLETED=0
+
+          #
+          # Alle Backup-Ressourcen durchsuchen und das neueste
+          # erfolgreich abgeschlossene Backup auswählen.
+          #
+          while IFS="$TAB" read -r \
+            BACKUP_NAMESPACE \
+            BACKUP_CLUSTER \
+            BACKUP_NAME \
+            BACKUP_PHASE \
+            BACKUP_STOPPED_AT
+          do
+            [ "$BACKUP_NAMESPACE" = "$NAMESPACE" ] || continue
+            [ "$BACKUP_CLUSTER" = "$CLUSTER" ] || continue
+            [ "$BACKUP_PHASE" = "completed" ] || continue
+
+            if [ -z "$BACKUP_STOPPED_AT" ]; then
+              INVALID_COMPLETED="$((INVALID_COMPLETED + 1))"
+              continue
+            fi
+
+            if ! BACKUP_EPOCH="$(
+              date -d "$BACKUP_STOPPED_AT" +%s 2>/dev/null
+            )"
+            then
+              echo "WARNUNG: $RESOURCE – Backup $BACKUP_NAME hat ungültiges stoppedAt: $BACKUP_STOPPED_AT" \
+                | tee -a "$SUMMARY"
+
+              INVALID_COMPLETED="$((INVALID_COMPLETED + 1))"
+              continue
+            fi
+
+            if [ "$BACKUP_EPOCH" -gt "$LATEST_EPOCH" ]; then
+              LATEST_EPOCH="$BACKUP_EPOCH"
+              LATEST_NAME="$BACKUP_NAME"
+              LATEST_TIME="$BACKUP_STOPPED_AT"
+            fi
+          done < /tmp/cnpg-backups.tsv
+
+          if [ "$LATEST_EPOCH" -eq 0 ]; then
+            MESSAGE="FEHLER: $RESOURCE hat kein erfolgreich abgeschlossenes Backup mit gültigem stoppedAt."
+
+            if [ "$INVALID_COMPLETED" -gt 0 ]; then
+              MESSAGE="$MESSAGE Ungültige completed-Backups: $INVALID_COMPLETED."
+            fi
+
+            echo "$MESSAGE" | tee -a "$SUMMARY" "$FAILURES"
+            FAILED=1
+            continue
+          fi
+
+          AGE_SECONDS="$((NOW - LATEST_EPOCH))"
+          AGE_MINUTES="$((AGE_SECONDS / 60))"
+          AGE_HOURS="$((AGE_SECONDS / 3600))"
+
+          if [ "$AGE_SECONDS" -lt 0 ]; then
+            MESSAGE="FEHLER: $RESOURCE – Backup-Zeitpunkt liegt in der Zukunft: $LATEST_NAME, $LATEST_TIME"
+
+            echo "$MESSAGE" | tee -a "$SUMMARY" "$FAILURES"
+            FAILED=1
+            continue
+          fi
+
+          if [ "$AGE_SECONDS" -gt "$MAX_AGE_SECONDS" ]; then
+            MESSAGE="FEHLER: $RESOURCE – letztes erfolgreiches Backup ist $AGE_HOURS Stunden alt: $LATEST_NAME, abgeschlossen $LATEST_TIME"
+
+            echo "$MESSAGE" | tee -a "$SUMMARY" "$FAILURES"
+            FAILED=1
+            continue
+          fi
+
+          echo "OK: $RESOURCE – $LATEST_NAME vor $AGE_MINUTES Minuten abgeschlossen ($LATEST_TIME)" \
+            | tee -a "$SUMMARY"
+
+        done < /tmp/cnpg-clusters.tsv
+
+        {
+          echo
+          echo "Geprüfte CloudNativePG-Cluster: $CHECKED"
+        } | tee -a "$SUMMARY"
+
+        if [ "$FAILED" -ne 0 ]; then
+          echo "Mindestens ein CloudNativePG-Cluster hat kein erfolgreiches Backup innerhalb der letzten $MAX_AGE_HOURS Stunden." \
+            | tee -a "$SUMMARY"
+          exit 1
+        fi
+
+        echo "Alle CloudNativePG-Cluster haben ein erfolgreiches Backup innerhalb der letzten $MAX_AGE_HOURS Stunden." \
+          | tee -a "$SUMMARY"
+
+  - name: notify-gotify
+    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+
+    environment:
+      GOTIFY_URL: "http://gotify.gotify.svc.cluster.local"
+
+      GOTIFY_TOKEN:
+        from_secret: gotify_volsync_token
+
+    commands:
+      - |
+        set -eu
+
+        apk add --no-cache curl
+
+        if [ -s cnpg-backup-failures.txt ]; then
+          DETAILS="$(cat cnpg-backup-failures.txt)"
+        elif [ -s cnpg-backup-summary.txt ]; then
+          DETAILS="$(cat cnpg-backup-summary.txt)"
+        else
+          DETAILS="Der CloudNativePG-Backup-Check ist ohne Detailbericht fehlgeschlagen."
+        fi
+
+        DETAILS="$(
+          printf '%s' "$DETAILS" | head -c 12000
+        )"
+
+        MESSAGE="$(
+          printf '%s\n\n%s\n\n%s' \
+            "Repository: $CI_REPO – Pipeline #$CI_PIPELINE_NUMBER" \
+            "$DETAILS" \
+            "$CI_PIPELINE_URL"
+        )"
+
+        curl \
+          --fail \
+          --silent \
+          --show-error \
+          -H "X-Gotify-Key: $GOTIFY_TOKEN" \
+          --form-string "title=CloudNativePG-Backup fehlt" \
+          --form-string "message=$MESSAGE" \
+          --form-string "priority=8" \
+          "$GOTIFY_URL/message"
+
+    when:
+      - status:
+          - failure

@@ -1,7 +1,7 @@
 ---
 clusterName: talos-pve
-talosVersion: v1.13.2
-kubernetesVersion: v1.35.4
+talosVersion: v1.13.6
+kubernetesVersion: v1.36.2
 endpoint: https://10.50.0.40:6443
 allowSchedulingOnMasters: false
 patches:

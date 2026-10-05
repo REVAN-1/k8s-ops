@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       gokapi:
@@ -39,7 +39,7 @@ spec:
           app: 
             image:
               repository: docker.io/f0rc3/gokapi
-              tag: "v2.2.4"
+              tag: "v2.2.4" # {"$imagepolicy": "flux-system:gokapi:tag"}
             env:
               TZ: Europe/Berlin
             resources:

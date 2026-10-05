@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       crafty:
@@ -32,9 +32,16 @@ spec:
           app: 
             image:
               repository: registry.gitlab.com/crafty-controller/crafty-4
-              tag: "4.10.7@sha256:67c2cbab1c88b75efb41b2970b1faca1a736b3532f6d1a806a7fe3f81664a199"
+              tag: "4.11.0@sha256:7b6e87514259549647e15ceeaf73d238792e6d77e2c79fc744d5badc8d6e997c"
             env:
               TZ: Europe/Berlin
+            resources:
+              requests:
+                cpu: 500m
+                memory: 512Mi
+              limits:
+                cpu: 2
+                memory: 3Gi
 
     service:
       app:

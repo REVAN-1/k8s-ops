@@ -4,4 +4,4 @@ resources:
   - namespace.yaml
   - woodpecker.yaml
   - secrets.yaml
-#  - backup.yaml
+  - rbac.yaml

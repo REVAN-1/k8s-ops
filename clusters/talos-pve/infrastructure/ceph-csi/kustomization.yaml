@@ -3,5 +3,6 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - secrets.yaml
-  - ceph-csi-rbd.yaml
-  - ceph-csi-cephfs.yaml
+  - helmrelease.yaml
+  - config.yaml
+#  -storageclass.yaml

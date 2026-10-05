@@ -1,0 +1,231 @@
+when:
+  - event: cron
+    cron: weekly-restic-check
+  - event: manual
+
+steps:
+  - name: check-restic-repositories
+    image: restic/restic:0.19.1
+
+    environment:
+      RESTIC_PASSWORD:
+        from_secret: restic_password
+      AWS_ACCESS_KEY_ID:
+        from_secret: restic_s3_access_key
+      AWS_SECRET_ACCESS_KEY:
+        from_secret: restic_s3_secret_key
+      AWS_DEFAULT_REGION: "home"
+      RESTIC_REPOSITORY_BASE: "s3:https://s3.int.server117.xyz/k8s-pvc"
+      RESTIC_RETRY_LOCK: "30m"
+      RESTIC_CHECK_PARTS: "4"
+
+    commands:
+      - |
+        set -u
+
+        REPOSITORY_FILE="restic-repositories.txt"
+        SUMMARY="restic-check-summary.txt"
+        FAILURES="restic-check-failures.txt"
+        LOG_DIRECTORY=".restic-check-logs"
+
+        : > "$SUMMARY"
+        : > "$FAILURES"
+        mkdir -p "$LOG_DIRECTORY"
+
+        if [ ! -f "$REPOSITORY_FILE" ]; then
+          echo "FEHLER: $REPOSITORY_FILE wurde nicht gefunden." \
+            | tee -a "$SUMMARY" "$FAILURES"
+          exit 1
+        fi
+
+        # sed entfernt die führende Null aus ISO-Wochen 01 bis 09.
+        WEEK="$(date -u +%V | sed 's/^0//')"
+
+        CHECK_PART="$(( ((WEEK - 1) % RESTIC_CHECK_PARTS) + 1 ))"
+        READ_DATA_SUBSET="$CHECK_PART/$RESTIC_CHECK_PARTS"
+
+        FAILED=0
+        CHECKED=0
+
+        {
+          echo "Restic Repository Check"
+          echo "Zeitpunkt: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          echo "Repository-Basis: $RESTIC_REPOSITORY_BASE"
+          echo "Datenbereich: $READ_DATA_SUBSET"
+          echo
+        } | tee -a "$SUMMARY"
+
+        while IFS= read -r REPOSITORY_NAME || [ -n "$REPOSITORY_NAME" ]
+        do
+          REPOSITORY_NAME="$(
+            printf '%s' "$REPOSITORY_NAME" | tr -d '\r'
+          )"
+
+          case "$REPOSITORY_NAME" in
+            ""|\#*)
+              continue
+              ;;
+            /*)
+              echo "FEHLER: Repository darf nicht mit / beginnen: $REPOSITORY_NAME" \
+                | tee -a "$SUMMARY" "$FAILURES"
+              FAILED=1
+              continue
+              ;;
+          esac
+
+          CHECKED="$((CHECKED + 1))"
+
+          RESTIC_REPOSITORY="$RESTIC_REPOSITORY_BASE/$REPOSITORY_NAME"
+          export RESTIC_REPOSITORY
+
+          SAFE_NAME="$(
+            printf '%s' "$REPOSITORY_NAME" | tr '/: ' '___'
+          )"
+
+          SNAPSHOT_FILE="$LOG_DIRECTORY/$SAFE_NAME-snapshots.json"
+          SNAPSHOT_LOG="$LOG_DIRECTORY/$SAFE_NAME-snapshots.log"
+          CHECK_LOG="$LOG_DIRECTORY/$SAFE_NAME-check.log"
+
+          echo "=================================================="
+          echo "Prüfe: $REPOSITORY_NAME"
+          echo "URL:   $RESTIC_REPOSITORY"
+          echo "=================================================="
+
+          #
+          # Repository öffnen und Snapshots abfragen
+          #
+          if ! restic \
+            --retry-lock "$RESTIC_RETRY_LOCK" \
+            snapshots --json \
+            > "$SNAPSHOT_FILE" \
+            2> "$SNAPSHOT_LOG"
+          then
+            {
+              echo "FEHLER: $REPOSITORY_NAME"
+              echo "Repository konnte nicht geöffnet werden."
+              echo "URL: $RESTIC_REPOSITORY"
+              echo
+              tail -n 20 "$SNAPSHOT_LOG"
+              echo
+            } | tee -a "$FAILURES"
+
+            echo "FEHLER  $REPOSITORY_NAME – Repository nicht lesbar" \
+              | tee -a "$SUMMARY"
+
+            FAILED=1
+            continue
+          fi
+
+          SNAPSHOT_COUNT="$(jq 'length' "$SNAPSHOT_FILE")"
+
+          if [ "$SNAPSHOT_COUNT" -eq 0 ]; then
+            {
+              echo "FEHLER: $REPOSITORY_NAME"
+              echo "Das Repository enthält keine Snapshots."
+              echo
+            } | tee -a "$FAILURES"
+
+            echo "FEHLER  $REPOSITORY_NAME – keine Snapshots" \
+              | tee -a "$SUMMARY"
+
+            FAILED=1
+            continue
+          fi
+
+          #
+          # Repository-Metadaten und einen Teil der Daten prüfen
+          #
+          if restic \
+            --retry-lock "$RESTIC_RETRY_LOCK" \
+            check \
+            --read-data-subset="$READ_DATA_SUBSET" \
+            > "$CHECK_LOG" \
+            2>&1
+          then
+            echo "OK      $REPOSITORY_NAME – $SNAPSHOT_COUNT Snapshots" \
+              | tee -a "$SUMMARY"
+          else
+            {
+              echo "FEHLER: $REPOSITORY_NAME"
+              echo "restic check ist fehlgeschlagen."
+              echo "URL: $RESTIC_REPOSITORY"
+              echo
+              tail -n 30 "$CHECK_LOG"
+              echo
+            } | tee -a "$FAILURES"
+
+            echo "FEHLER  $REPOSITORY_NAME – Integritätsprüfung fehlgeschlagen" \
+              | tee -a "$SUMMARY"
+
+            FAILED=1
+          fi
+
+          echo
+        done < "$REPOSITORY_FILE"
+
+        if [ "$CHECKED" -eq 0 ]; then
+          echo "FEHLER: Keine Repositories in $REPOSITORY_FILE eingetragen." \
+            | tee -a "$SUMMARY" "$FAILURES"
+          exit 1
+        fi
+
+        {
+          echo
+          echo "Geprüfte Repositories: $CHECKED"
+          echo "Datenbereich dieses Laufs: $READ_DATA_SUBSET"
+        } | tee -a "$SUMMARY"
+
+        if [ "$FAILED" -ne 0 ]; then
+          echo "Mindestens ein Repository-Check ist fehlgeschlagen."
+          exit 1
+        fi
+
+        echo "Alle Repository-Checks waren erfolgreich."
+  - name: notify-gotify
+    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+
+    environment:
+      GOTIFY_URL: "https://gotify.htz.server117.xyz"
+
+      GOTIFY_TOKEN:
+        from_secret: gotify_volsync_token
+
+    commands:
+      - |
+        set -eu
+
+        apk add --no-cache curl
+
+        if [ -s restic-check-failures.txt ]; then
+          DETAILS="$(cat restic-check-failures.txt)"
+        elif [ -s restic-check-summary.txt ]; then
+          DETAILS="$(cat restic-check-summary.txt)"
+        else
+          DETAILS="Der Restic-Check ist ohne lesbaren Bericht fehlgeschlagen."
+        fi
+
+        # Gotify-Nachrichten nicht unbegrenzt groß werden lassen.
+        DETAILS="$(
+          printf '%s' "$DETAILS" | head -c 12000
+        )"
+
+        MESSAGE="$(
+          printf '%s\n\n%s\n\n%s' \
+            "Repository: $CI_REPO – Pipeline #$CI_PIPELINE_NUMBER" \
+            "$DETAILS" \
+            "$CI_PIPELINE_URL"
+        )"
+
+        curl \
+          --fail \
+          --silent \
+          --show-error \
+          -H "X-Gotify-Key: $GOTIFY_TOKEN" \
+          --form-string "title=Restic Repository Check fehlgeschlagen" \
+          --form-string "message=$MESSAGE" \
+          --form-string "priority=8" \
+          "$GOTIFY_URL/message"
+
+    when:
+      - status:
+          - failure

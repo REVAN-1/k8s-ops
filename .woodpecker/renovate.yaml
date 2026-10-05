@@ -1,18 +1,18 @@
 when:
-  event:
-    - cron
-    - manual
+  - event: cron
+    cron: daily-checks
+  - event: manual
 
 steps:
   - name: renovate
-    image: renovate/renovate:43
+    image: renovate/renovate:44
 
     environment:
       RENOVATE_TOKEN: 
           from_secret: renovate_token
       RENOVATE_PLATFORM: "forgejo"
-      RENOVATE_ENDPOINT: "https://git.example.com/api/v1"
-      RENOVATE_GIT_AUTHOR: "renovate <renovate@exmaple.com>"
+      RENOVATE_ENDPOINT: "https://git.server117.xyz/api/v1"
+      RENOVATE_GIT_AUTHOR: "renovate <renovate@example.com>"
       RENOVATE_AUTODISCOVER: "true"
       RENOVATE_OPTIMIZE_FOR_DISABLED: "true"
       RENOVATE_GITHUB_COM_TOKEN:

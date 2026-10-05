@@ -1,0 +1,67 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: trilium
+  namespace: trilium
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: trilium
+      sourceRef:
+        kind: HelmRepository
+        name: trilium
+        namespace: flux-system
+      version: "2.0.0"
+  values:
+    controllers:
+      main:
+        containers:
+          trilium:
+            image:
+              repository: triliumnext/trilium
+              tag: v0.106.0
+            env:
+              TZ: Europe/Berlin
+              TRILIUM_GENERAL_INSTANCENAME: trilium
+              TRILIUM_MULTIFACTORAUTHENTICATION_OAUTHBASEURL: https://wiki.k8s.exmaple.com
+              TRILIUM_MULTIFACTORAUTHENTICATION_OAUTHISSUERBASEURL: https://idm.exmaple.com/application/o/trilium/.well-known/openid-configuration
+              TRILIUM_MULTIFACTORAUTHENTICATION_OAUTHISSUERNAME: Authentik
+              TRILIUM_MULTIFACTORAUTHENTICATION_OAUTHSCOPE: "openid profile email"
+              TRILIUM_LOGGING_RETENTIONDAYS: "30"
+            envFrom:
+              - secret: trilium-oidc
+    configini:
+      network:
+        trustedReverseProxy: "10.244.0.0/16"              
+    persistence:
+      data:
+        enabled: true
+        type: persistentVolumeClaim
+        accessMode: ReadWriteOnce
+        size: 20Gi
+        storageClass: csi-rbd-sc            
+    ingress:
+      main:
+        enabled: true
+        className: cilium
+        hosts:
+          - host: wiki.k8s.exmaple.com
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: main
+                  port: http
+        tls:
+          - hosts:
+              - "wiki.k8s.exmaple.com"                  

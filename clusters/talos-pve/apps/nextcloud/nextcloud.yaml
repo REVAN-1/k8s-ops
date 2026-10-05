@@ -16,7 +16,7 @@ spec:
         kind: HelmRepository
         name: nextcloud
         namespace: flux-system
-      version: "9.2.0"
+      version: "9.4.0"
   values:
     replicaCount: 3
     affinity:
@@ -52,7 +52,8 @@ spec:
         cpu: 500m
         memory: 1Gi
       limits:
-        memory: 2Gi
+        cpu: 1500m
+        memory: 1Gi
 
     ingress:
       enabled: true
@@ -127,21 +128,14 @@ spec:
         usernameKey: username
         passwordKey: password
 
-    redis:
+    externalRedis:
       enabled: true
-      architecture: standalone
-      auth:
-        enabled: false
-      global:
-        storageClass: ""
-      master:
-        persistence:
-          enabled: false
-      replica:
-        replicaCount: 0
-        enabled: false
-        persistence:
-          enabled: false
+      host: "nextcloud-session-cache"
+      port: "6379"
+      password: ""
+
+    redis:
+      enabled: false
 
     persistence:
       enabled: true

@@ -30,6 +30,14 @@ spec:
     myjd:
       existingSecretName: "jdownloader2-secrets"
 
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
     persistence:
       enabled: true
       existingClaim: "jdownloader2-nfs"

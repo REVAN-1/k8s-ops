@@ -12,13 +12,15 @@ spec:
         kind: HelmRepository
         name: cilium
         namespace: flux-system
-      version: "1.19.5"
+      version: "1.20.2"
   install:
     crds: CreateReplace
   upgrade:
     crds: CreateReplace
   values:
     autoDirectNodeRoutes: true
+
+    apiRateLimit: "endpoint-create=rate-limit:2/s,rate-burst:8,max-wait-duration:150s,endpoint-patch=rate-limit:2/s,rate-burst:8,max-wait-duration:60s"
     bgpControlPlane:
       enabled: true
     cgroup:

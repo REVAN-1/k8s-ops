@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       kavita:
@@ -34,12 +34,12 @@ spec:
             runAsUser: 1000
             runAsGroup: 1000
             fsGroup: 1000
-            fsGroupChangePolicy: OnRootMismatch
+            fsGroupChangePolicy: Always
         containers:
           app: 
             image:
               repository: docker.io/jvmilazz0/kavita
-              tag: "0.9.0"
+              tag: "0.9.0.2"
             env:
               TZ: Europe/Berlin
             resources:
@@ -48,7 +48,7 @@ spec:
                 memory: 256Mi
               limits:
                 cpu: 500m
-                memory: 1Gi
+                memory: 768Mi
             securityContext:
               runAsNonRoot: true
               allowPrivilegeEscalation: false
@@ -72,7 +72,13 @@ spec:
         advancedMounts:
           kavita:
             app:
-              - path: /kavita/config            
+              - path: /kavita/config          
+
+      tmp:
+        type: emptyDir
+        globalMounts:
+          - path: /tmp  
+
       books:
         type: nfs
         server: 192.168.178.118

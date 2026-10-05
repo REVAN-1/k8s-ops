@@ -1,0 +1,30 @@
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  name: immich-session-cache
+  namespace: immich
+spec:
+  replicas: 3
+
+  args:
+    - "--default_lua_flags=allow-undeclared-keys"
+
+  serviceSpec:
+    name: immich-session-cache
+    type: ClusterIP
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 356Mi
+
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              dragonflydb.io/name: immich-session-cache

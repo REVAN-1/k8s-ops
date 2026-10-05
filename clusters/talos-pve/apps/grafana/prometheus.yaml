@@ -21,12 +21,32 @@ spec:
         kind: HelmRepository
         name: prometheus
         namespace: flux-system
-      version: "29.14.0"
+      version: "29.x"
   values:
+    scrapeConfigs:
+      kubernetes-api-servers:
+        enabled: false  
+      kubernetes-nodes:
+        enabled: false
+      kubernetes-nodes-cadvisor:
+        enabled: false
+      kubernetes-service-endpoints:
+        enabled: false
+      kubernetes-service-endpoints-slow:
+        enabled: false
+      prometheus-pushgateway:
+        enabled: false
+      kubernetes-services:
+        enabled: false
+      kubernetes-pods:
+        enabled: false
+      kubernetes-pods-slow:
+        enabled: false
     serverFiles:
       prometheus.yml:
        scrape_configs:
         - job_name: 'pve-exporter'
+          scrape_interval: 30s
           static_configs:
             - targets:
               - 10.50.0.11:9221
@@ -41,9 +61,11 @@ spec:
               - targets:
                   - 'mktxp-exporter:49090'
         - job_name: 'load-balancer-metrics'
+          scrape_interval: 1m
           static_configs:
             - targets: ['10.50.0.15:8405']
         - job_name: 'garage'
+          scrape_interval: 30s
           authorization:
             type: Bearer
             credentials_file: /etc/secrets/garage/token
@@ -51,6 +73,7 @@ spec:
             - targets:
                 - 's3.int.exmaple.com:3903'
         - job_name: 'volsync'
+          scrape_interval: 1m
           metrics_path: /metrics
           scheme: https
           static_configs:
@@ -59,40 +82,78 @@ spec:
           tls_config:
             insecure_skip_verify: true
         - job_name: 'gatus'
+          scrape_interval: 30s
           metrics_path: /metrics
           static_configs:
             - targets: 
                 - gatus:80
         - job_name: 'scrunity_nas'
+          scrape_interval: 30s
           metrics_path: /api/metrics
           scheme: https
           static_configs:
             - targets: 
                 - 'scrutiny.int.exmaple.com'
         - job_name: 'scrunity_vault'
+          scrape_interval: 30s
           metrics_path: /api/metrics
           scheme: https
           static_configs:
             - targets: 
-                - 'vault.int.exmaple.com'                
+                - 'vault.int.exmaple.com'        
+        - job_name: 'telegraf_evcc'
+          scrape_interval: 15s
+          metrics_path: /metrics
+          static_configs:
+            - targets: 
+                - telegraf-pv:9273
+        - job_name: 'telegraf_froeling'
+          scrape_interval: 15s
+          metrics_path: /metrics
+          static_configs:
+            - targets: 
+                - telegraf-froeling:9273
+        - job_name: homeassistant
+          scrape_interval: 30s
+          scrape_timeout: 10s
+          metrics_path: /api/prometheus
+          scheme: https
+          authorization:
+            type: Bearer
+            credentials_file: /etc/secrets/homeassistant/token
+          static_configs:
+            - targets:
+                - hass.int.exmaple.com:8123   
 
 
     server:
+      retention: "90d"
+      retentionSize: "48GB"
+      extraFlags:
+        - web.enable-lifecycle
+        - storage.tsdb.wal-compression
       extraSecretMounts:
         - name: garage-token
           mountPath: /etc/secrets/garage
           secretName: prometheus-garage-token
           readOnly: true
+        - name: homeassistant-token
+          mountPath: /etc/secrets/homeassistant
+          secretName: prometheus-homeassistant-token
+          readOnly: true
       persistentVolume:
         enabled: true
         accessModes:
           - ReadWriteOnce
-        size: 25Gi
+        size: 50Gi
         storageClass: csi-rbd-sc
       resources:
-        limits:
-          cpu: 400m
+        requests:
+          cpu: 250m
           memory: 1Gi
+        limits:
+          cpu: 1
+          memory: 2Gi
     prometheus-node-exporter:
       enabled: false
     alertmanager:

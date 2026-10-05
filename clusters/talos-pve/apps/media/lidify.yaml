@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       lidify:
@@ -41,6 +41,13 @@ spec:
             envFrom:
               - secretRef:
                   name: lidify-env
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                cpu: 250m
+                memory: 256Mi
 
     service:
       app:

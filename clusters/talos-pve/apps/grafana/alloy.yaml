@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: grafana
         namespace: flux-system
-      version: "1.10.0"
+      version: "1.13.0"
   values:
     controller:
       type: deployment
@@ -31,6 +31,13 @@ spec:
       create: true
 
     alloy:
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
       enableHttpServerPort: true
       listenAddr: 0.0.0.0
       listenPort: 80

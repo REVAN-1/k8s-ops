@@ -1,0 +1,27 @@
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  name: nextcloud-session-cache
+  namespace: nextcloud
+spec:
+  replicas: 3
+
+  serviceSpec:
+    name: nextcloud-session-cache
+    type: ClusterIP
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              dragonflydb.io/name: nextcloud-session-cache

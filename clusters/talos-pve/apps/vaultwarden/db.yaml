@@ -40,6 +40,10 @@ spec:
     size: 2Gi
     storageClass: csi-rbd-sc
 
+  walStorage:
+    size: 4Gi
+    storageClass: csi-rbd-sc
+
   plugins:
     - name: barman-cloud.cloudnative-pg.io
       isWALArchiver: true

@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       paperless:
@@ -32,7 +32,7 @@ spec:
           app: 
             image:
               repository: ghcr.io/paperless-ngx/paperless-ngx
-              tag: "2.20"
+              tag: "3.2@sha256:5fa76604a81df6945086e0837b14b56543d137e8ce4f311cc5d9ebe907e74e79"
             env:
               PAPERLESS_ENABLE_ALLAUTH: true
               PAPERLESS_APPS: "allauth.socialaccount.providers.openid_connect"
@@ -52,29 +52,51 @@ spec:
             envFrom:
               - secretRef:
                   name: paperless-env      
+            resources:
+              requests:
+                cpu: 500m
+                memory: 512Mi
+              limits:
+                cpu: 2
+                memory: 1Gi
       valkey:
         containers:
           valkey:
             image:
               repository: valkey/valkey
-              tag: "9-alpine@sha256:a35428eba9043cc0b79dbe54100f0c92784f2de00ad09b01182bfb1c5c83d1bd"
+              tag: "9-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11"
+            resources:
+              requests:
+                memory: 32Mi
+              limits:
+                memory: 64Mi
       tika:
         containers:
           tika:
             image:
               repository: docker.io/apache/tika
               tag: "latest"
+            resources:
+              requests:
+                memory: 256Mi
+              limits:
+                memory: 512Mi
       gotenberg: 
         containers: 
           gotenberg:
             image:
               repository: docker.io/gotenberg/gotenberg
-              tag: "8.34@sha256:67097317623a503ba2a6a7e9ae8db6929a1f7e1bbd88077bacf2d325fbdab923"
+              tag: "8.37@sha256:f29984bd1e226bf1b93ba90af06000afa8b315853e99d27b9aaa41b93f15c769"
             command: 
               - "gotenberg"
             args:
               - "--chromium-disable-javascript=true"
               - "--chromium-allow-list=file:///tmp/.*"
+            resources:
+              requests:
+                memory: 256Mi
+              limits:
+                memory: 768Mi
 
     service:
       app:

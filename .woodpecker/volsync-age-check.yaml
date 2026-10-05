@@ -1,0 +1,185 @@
+when:
+  - event: cron
+    cron: daily-checks
+  - event: manual
+  
+steps:
+  - name: check-volsync-backup-age
+    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+
+    environment:
+      KUBECTL_VERSION: "v1.36.2"
+      MAX_AGE_HOURS: "26"
+
+    backend_options:
+      kubernetes:
+        serviceAccountName: volsync-observer
+
+    commands:
+      - |
+        set -eu
+
+        apk add --no-cache \
+          ca-certificates \
+          coreutils \
+          curl \
+          jq
+
+        REPORT="volsync-failures.txt"
+        : > "$REPORT"
+
+        case "$(uname -m)" in
+          x86_64)
+            KUBE_ARCH="amd64"
+            ;;
+          aarch64|arm64)
+            KUBE_ARCH="arm64"
+            ;;
+          *)
+            echo "Nicht unterstützte Architektur: $(uname -m)" | tee -a "$REPORT"
+            exit 1
+            ;;
+        esac
+
+        echo "Installiere kubectl $KUBECTL_VERSION für $KUBE_ARCH"
+
+        curl -fsSLo /tmp/kubectl \
+          "https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/$KUBE_ARCH/kubectl"
+
+        curl -fsSLo /tmp/kubectl.sha256 \
+          "https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/$KUBE_ARCH/kubectl.sha256"
+
+        echo "$(cat /tmp/kubectl.sha256)  /tmp/kubectl" \
+          | sha256sum -c -
+
+        install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+
+        echo "Lese ReplicationSources aus dem Cluster"
+
+        if ! kubectl get replicationsources.volsync.backube \
+          --all-namespaces \
+          --output=json \
+          > /tmp/replicationsources.json
+        then
+          echo "Kubernetes-API konnte nicht abgefragt werden. RBAC oder API-Verbindung prüfen." \
+            | tee -a "$REPORT"
+          exit 1
+        fi
+
+        jq -r '
+          .items[]
+          | select(.metadata.name | startswith("backup-"))
+          | [
+              .metadata.namespace,
+              .metadata.name,
+              (.status.lastSyncTime // "")
+            ]
+          | @tsv
+        ' /tmp/replicationsources.json > /tmp/replicationsources.tsv
+
+        COUNT="$(
+          jq '
+            [
+              .items[]
+              | select(.metadata.name | startswith("backup-"))
+            ]
+            | length
+          ' /tmp/replicationsources.json
+        )"
+
+        if [ "$COUNT" -eq 0 ]; then
+          echo "Keine VolSync ReplicationSources mit Namen backup-* gefunden." \
+            | tee -a "$REPORT"
+          exit 1
+        fi
+
+        NOW="$(date -u +%s)"
+        MAX_AGE_SECONDS="$((MAX_AGE_HOURS * 3600))"
+        FAILED=0
+        TAB="$(printf '\t')"
+
+        echo "Prüfe $COUNT ReplicationSources:"
+        echo
+
+        while IFS="$TAB" read -r NAMESPACE NAME LAST_SYNC
+        do
+          RESOURCE="$NAMESPACE/$NAME"
+
+          if [ -z "$LAST_SYNC" ]; then
+            echo "FEHLER: $RESOURCE hat noch kein lastSyncTime." \
+              | tee -a "$REPORT"
+            FAILED=1
+            continue
+          fi
+
+          if ! LAST_EPOCH="$(date -d "$LAST_SYNC" +%s 2>/dev/null)"; then
+            echo "FEHLER: $RESOURCE hat ein ungültiges lastSyncTime: $LAST_SYNC" \
+              | tee -a "$REPORT"
+            FAILED=1
+            continue
+          fi
+
+          AGE_SECONDS="$((NOW - LAST_EPOCH))"
+          AGE_HOURS="$((AGE_SECONDS / 3600))"
+
+          if [ "$AGE_SECONDS" -lt 0 ]; then
+            echo "FEHLER: $RESOURCE hat ein lastSyncTime in der Zukunft: $LAST_SYNC" \
+              | tee -a "$REPORT"
+            FAILED=1
+          elif [ "$AGE_SECONDS" -gt "$MAX_AGE_SECONDS" ]; then
+            echo "FEHLER: $RESOURCE – letzter erfolgreicher Sync vor ${AGE_HOURS}h ($LAST_SYNC)." \
+              | tee -a "$REPORT"
+            FAILED=1
+          else
+            echo "OK: $RESOURCE – letzter erfolgreicher Sync vor ${AGE_HOURS}h ($LAST_SYNC)."
+          fi
+        done < /tmp/replicationsources.tsv
+
+        echo
+
+        if [ "$FAILED" -ne 0 ]; then
+          echo "Mindestens ein VolSync-Backup ist nicht aktuell."
+          exit 1
+        fi
+
+        echo "Alle $COUNT VolSync-Backups sind aktuell."
+
+  - name: notify-gotify
+    image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+
+    environment:
+      GOTIFY_URL: "https://gotify.htz.server117.xyz"
+
+      GOTIFY_TOKEN:
+        from_secret: gotify_volsync_token
+
+    commands:
+      - |
+        set -eu
+
+        apk add --no-cache curl
+
+        if [ -s volsync-failures.txt ]; then
+          DETAILS="$(cat volsync-failures.txt)"
+        else
+          DETAILS="Der Prüf-Schritt ist fehlgeschlagen, bevor ein Detailbericht erstellt werden konnte."
+        fi
+
+        MESSAGE="$(printf '%s\n\n%s\n\n%s' \
+          "Repository: $CI_REPO – Pipeline #$CI_PIPELINE_NUMBER" \
+          "$DETAILS" \
+          "$CI_PIPELINE_URL")"
+
+        curl \
+          --fail \
+          --silent \
+          --show-error \
+          -H "X-Gotify-Key: $GOTIFY_TOKEN" \
+          --form-string "title=VolSync-Backup-Check fehlgeschlagen" \
+          --form-string "message=$MESSAGE" \
+          --form-string "priority=8" \
+          "$GOTIFY_URL/message"
+
+    when:
+      - status:
+          - failure

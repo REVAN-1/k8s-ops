@@ -8,3 +8,4 @@ resources:
   - secrets.yaml
   - backup.yaml
   - network-policies.yaml
+  - dragonflydb.yaml

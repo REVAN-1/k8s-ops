@@ -23,6 +23,13 @@ spec:
         namespace: flux-system
       version: "1.5.0"
   values:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
     ingress:
       enabled: true
       annotations: 

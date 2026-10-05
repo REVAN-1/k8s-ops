@@ -22,7 +22,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
 
   values:
     controllers:
@@ -64,6 +64,13 @@ spec:
                 create mask = 0660;
                 directory mask = 0770;
                 force user = scan
+            resources:
+              requests:
+                cpu: 50m
+                memory: 32Mi
+              limits:
+                cpu: 200m
+                memory: 128Mi
 
     service:
       app:

@@ -15,3 +15,4 @@ resources:
   - sonarr.yaml
   - radarr.yaml
   - network-policies.yaml
+  - image-policies.yaml

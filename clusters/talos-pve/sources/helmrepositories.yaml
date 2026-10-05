@@ -28,6 +28,15 @@ spec:
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
+  name: ceph-csi-operator
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://ceph.github.io/ceph-csi-operator/
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
   name: jetstack
   namespace: flux-system
 spec:
@@ -40,6 +49,7 @@ metadata:
   name: cloudnative-pg
   namespace: flux-system
 spec:
+  interval: 1h0m0s
   url: https://cloudnative-pg.github.io/charts
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
@@ -86,6 +96,15 @@ metadata:
 spec:
   interval: 1h0m0s
   url: https://grafana.github.io/helm-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: grafana-community
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://grafana-community.github.io/helm-charts
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
@@ -312,3 +331,27 @@ metadata:
 spec:
   interval: 1h0m0s
   url: https://twin.github.io/helm-charts
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: dragonfly-operator
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: oci://ghcr.io/dragonflydb/dragonfly-operator/helm/dragonfly-operator
+  ref:
+    tag: v1.7.0
+    digest: sha256:090edee24f59cdbe4b5b4ad24f3bdf687ff83c47ad8d5099c7d6bcadafbde609
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: trilium
+  namespace: flux-system
+spec:
+  interval: 1h0m0s
+  url: https://triliumnext.github.io/helm-charts

@@ -1,0 +1,666 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: telegraf-pv
+  namespace: grafana
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true 
+  chart:
+    spec:
+      chart: telegraf
+      sourceRef:
+        kind: HelmRepository
+        name: influxdata
+        namespace: flux-system
+      version: "1.8.77"
+  values:
+    tplVersion: 2
+    config:
+      agent:
+        interval: "10s"
+        round_interval: true
+        metric_batch_size: 1000
+        metric_buffer_limit: 10000
+        collection_jitter: "0s"
+        flush_interval: "10s"
+        flush_jitter: "0s"
+        precision: ""
+        debug: false
+        quiet: false
+        logfile: ""
+        hostname: "${HOSTNAME}"
+        omit_hostname: false
+
+      inputs:
+        - modbus:
+            name: "solaredge-inverter"
+            name_override: "solaredge"
+
+            controller: "tcp://192.168.178.232:1502"
+            transmission_mode: "TCP"
+            configuration_type: "request"
+            timeout: "5s"
+
+            exclude_register_type_tag: true
+
+            request:
+              - slave_id: 1
+                register: "holding"
+                byte_order: "ABCD"
+                measurement: "solaredge"
+                optimization: "shrink"
+
+                fields:
+                  - address: 40071
+                    name: "ac_current_raw"
+                    type: "UINT16"
+
+                  - address: 40075
+                    name: "ac_current_sf"
+                    type: "INT16"
+
+                  - address: 40083
+                    name: "ac_power_raw"
+                    type: "INT16"
+
+                  - address: 40084
+                    name: "ac_power_sf"
+                    type: "INT16"
+
+                  - address: 40085
+                    name: "ac_frequency_raw"
+                    type: "UINT16"
+
+                  - address: 40086
+                    name: "ac_frequency_sf"
+                    type: "INT16"
+
+                  - address: 40093
+                    name: "ac_energy_wh_raw"
+                    type: "UINT32"
+
+                  - address: 40095
+                    name: "ac_energy_wh_sf"
+                    type: "INT16"
+
+                  - address: 40096
+                    name: "dc_current_raw"
+                    type: "UINT16"
+
+                  - address: 40097
+                    name: "dc_current_sf"
+                    type: "INT16"
+
+                  - address: 40098
+                    name: "dc_voltage_raw"
+                    type: "UINT16"
+
+                  - address: 40099
+                    name: "dc_voltage_sf"
+                    type: "INT16"
+
+                  - address: 40100
+                    name: "dc_power_raw"
+                    type: "INT16"
+
+                  - address: 40101
+                    name: "dc_power_sf"
+                    type: "INT16"
+
+                  - address: 40103
+                    name: "temperature_raw"
+                    type: "INT16"
+
+                  - address: 40106
+                    name: "temperature_sf"
+                    type: "INT16"
+
+                  - address: 40107
+                    name: "status"
+                    type: "UINT16"
+
+              - slave_id: 2
+                register: "holding"
+                byte_order: "ABCD"
+                measurement: "solaredge"
+                optimization: "shrink"
+
+                fields:
+                  - address: 40071
+                    name: "ac_current_raw"
+                    type: "UINT16"
+
+                  - address: 40075
+                    name: "ac_current_sf"
+                    type: "INT16"
+
+                  - address: 40083
+                    name: "ac_power_raw"
+                    type: "INT16"
+
+                  - address: 40084
+                    name: "ac_power_sf"
+                    type: "INT16"
+
+                  - address: 40085
+                    name: "ac_frequency_raw"
+                    type: "UINT16"
+
+                  - address: 40086
+                    name: "ac_frequency_sf"
+                    type: "INT16"
+
+                  - address: 40093
+                    name: "ac_energy_wh_raw"
+                    type: "UINT32"
+
+                  - address: 40095
+                    name: "ac_energy_wh_sf"
+                    type: "INT16"
+
+                  - address: 40096
+                    name: "dc_current_raw"
+                    type: "UINT16"
+
+                  - address: 40097
+                    name: "dc_current_sf"
+                    type: "INT16"
+
+                  - address: 40098
+                    name: "dc_voltage_raw"
+                    type: "UINT16"
+
+                  - address: 40099
+                    name: "dc_voltage_sf"
+                    type: "INT16"
+
+                  - address: 40100
+                    name: "dc_power_raw"
+                    type: "INT16"
+
+                  - address: 40101
+                    name: "dc_power_sf"
+                    type: "INT16"
+
+                  - address: 40103
+                    name: "temperature_raw"
+                    type: "INT16"
+
+                  - address: 40106
+                    name: "temperature_sf"
+                    type: "INT16"
+
+                  - address: 40107
+                    name: "status"
+                    type: "UINT16"
+
+      processors:
+        - starlark:
+            namepass:
+              - "solaredge"
+
+            source: |
+              load("math.star", "math")
+
+              def calculate(fields, raw_name, sf_name):
+                  if raw_name not in fields or sf_name not in fields:
+                      return None
+
+                  sf = fields[sf_name]
+
+                  # Ungültige beziehungsweise nicht implementierte
+                  # SunSpec-Skalierungsfaktoren verwerfen.
+                  if sf < -10 or sf > 10:
+                      return None
+
+                  return float(fields[raw_name]) * math.pow(10.0, float(sf))
+
+              def apply(metric):
+                  fields = metric.fields
+
+                  mappings = [
+                      ("ac_current_raw", "ac_current_sf", "ac_current_a"),
+                      ("ac_power_raw", "ac_power_sf", "ac_power_w"),
+                      ("ac_frequency_raw", "ac_frequency_sf", "ac_frequency_hz"),
+                      ("ac_energy_wh_raw", "ac_energy_wh_sf", "ac_energy_wh"),
+                      ("dc_current_raw", "dc_current_sf", "dc_current_a"),
+                      ("dc_voltage_raw", "dc_voltage_sf", "dc_voltage_v"),
+                      ("dc_power_raw", "dc_power_sf", "dc_power_w"),
+                      ("temperature_raw", "temperature_sf", "temperature_c"),
+                  ]
+
+                  for raw_name, sf_name, result_name in mappings:
+                      value = calculate(fields, raw_name, sf_name)
+                      if value != None:
+                          fields[result_name] = value
+
+                  return metric
+
+      outputs:
+        - prometheus_client:
+            listen: ":9273"
+            path: "/metrics"
+            expiration_interval: "30s"
+
+    resources:
+     requests:
+       memory: 128Mi
+       cpu: 100m
+     limits:
+       memory: 512Mi
+       cpu: 200m
+    pdb:
+      create: false
+
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: telegraf-froeling
+  namespace: grafana
+
+spec:
+  interval: 10m
+
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+
+  chart:
+    spec:
+      chart: telegraf
+      sourceRef:
+        kind: HelmRepository
+        name: influxdata
+        namespace: flux-system
+      version: "1.8.77"
+
+  values:
+    tplVersion: 2
+
+    config:
+      agent:
+        interval: "10s"
+        round_interval: true
+        metric_batch_size: 1000
+        metric_buffer_limit: 10000
+        collection_jitter: "0s"
+        flush_interval: "10s"
+        flush_jitter: "0s"
+        precision: ""
+        debug: true
+        quiet: false
+        logfile: ""
+        hostname: "${HOSTNAME}"
+        omit_hostname: false
+
+      inputs:
+        - modbus:
+            name: "froeling-s5"
+            name_override: "froeling_s5"
+
+            controller: "tcp://10.60.0.101:502"
+            transmission_mode: "TCP"
+            configuration_type: "request"
+            timeout: "5s"
+
+            exclude_register_type_tag: true
+            optimization: "none"
+
+            request:
+              - slave_id: 1
+                register: "input"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 0
+                    name: "modbus_protokollversion"
+                    type: "INT16"
+
+
+              - slave_id: 1
+                register: "input"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 50
+                    name: "alarme_aktuell"
+                    type: "INT16"
+
+                  - address: 51
+                    name: "fehler_aktuell"
+                    type: "INT16"
+
+                  - address: 52
+                    name: "warnungen_aktuell"
+                    type: "INT16"
+
+                  - address: 53
+                    name: "infos_aktuell"
+                    type: "INT16"
+
+
+              - slave_id: 1
+                register: "input"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 1000
+                    name: "kesselzustand"
+                    type: "INT16"
+
+                  - address: 1001
+                    name: "abgastemperatur_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 1002
+                    name: "kesseltemperatur_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 1003
+                    name: "ruecklauftemperatur_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 1004
+                    name: "kesselpumpe_soll_pct"
+                    type: "INT16"
+
+                  - address: 1005
+                    name: "restsauerstoff_pct"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 1006
+                    name: "kessel_freigegeben"
+                    type: "INT16"
+
+                  - address: 1007
+                    name: "waermeerzeuger_aktiv"
+                    type: "INT16"
+
+                  - address: 1008
+                    name: "kesseltyp"
+                    type: "INT16"
+
+                  - address: 1009
+                    name: "fehlerzustand"
+                    type: "INT16"
+
+              - slave_id: 1
+                register: "input"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 2000
+                    name: "hk1_aussentemperatur_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 2001
+                    name: "hk1_vorlauf_ist_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 2002
+                    name: "hk1_vorlauf_soll_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 2003
+                    name: "hk1_pumpe_aktiv"
+                    type: "INT16"
+
+                  - address: 2004
+                    name: "hk1_betriebszustand"
+                    type: "INT16"
+
+                  - address: 2005
+                    name: "hk1_info"
+                    type: "INT16"
+
+              - slave_id: 1
+                register: "input"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 2200
+                    name: "hk2_aussentemperatur_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 2201
+                    name: "hk2_vorlauf_ist_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 2202
+                    name: "hk2_vorlauf_soll_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 2203
+                    name: "hk2_pumpe_aktiv"
+                    type: "INT16"
+
+                  - address: 2204
+                    name: "hk2_betriebszustand"
+                    type: "INT16"
+
+                  - address: 2205
+                    name: "hk2_info"
+                    type: "INT16"
+
+              - slave_id: 1
+                register: "input"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 6000
+                    name: "puffer1_fuehler_a_c"
+                    type: "INT16"
+                    scale: 0.1
+
+
+              - slave_id: 1
+                register: "input"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 6007
+                    name: "puffer1_fuehler_h_c"
+                    type: "INT16"
+                    scale: 0.1
+
+
+              - slave_id: 1
+                register: "input"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 6014
+                    name: "puffer2_fuehler_e_c"
+                    type: "INT16"
+                    scale: 0.1
+
+
+              - slave_id: 1
+                register: "input"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 6019
+                    name: "puffer2_fuehler_j_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 6020
+                    name: "puffer_ladezustand_pct"
+                    type: "INT16"
+
+                  - address: 6021
+                    name: "puffer_ladeaktivitaet"
+                    type: "INT16"
+
+
+              - slave_id: 1
+                register: "input"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 7500
+                    name: "warmwasser_temperatur_c"
+                    type: "INT16"
+                    scale: 0.1
+
+
+              - slave_id: 1
+                register: "input"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 7503
+                    name: "warmwasser_ladezustand_pct"
+                    type: "INT16"
+
+                  - address: 7504
+                    name: "warmwasser_ladepumpe_soll_pct"
+                    type: "INT16"
+
+                  - address: 7505
+                    name: "warmwasser_zustand"
+                    type: "INT16"
+
+
+              - slave_id: 1
+                register: "holding"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 1001
+                    name: "modbus_anforderung"
+                    type: "INT16"
+
+                  - address: 1002
+                    name: "modbus_temperaturanforderung_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 1003
+                    name: "modbus_leistungsanforderung_pct"
+                    type: "INT16"
+
+                  - address: 1004
+                    name: "modbus_freigabe"
+                    type: "INT16"
+
+
+              - slave_id: 1
+                register: "holding"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 2000
+                    name: "hk1_betriebsart"
+                    type: "INT16"
+
+                  - address: 2001
+                    name: "hk1_raum_soll_komfort_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 2002
+                    name: "hk1_raum_soll_absenkung_c"
+                    type: "INT16"
+                    scale: 0.1
+
+
+              - slave_id: 1
+                register: "holding"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 2200
+                    name: "hk2_betriebsart"
+                    type: "INT16"
+
+                  - address: 2201
+                    name: "hk2_raum_soll_komfort_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 2202
+                    name: "hk2_raum_soll_absenkung_c"
+                    type: "INT16"
+                    scale: 0.1
+
+
+              - slave_id: 1
+                register: "holding"
+                byte_order: "ABCD"
+                measurement: "froeling_s5"
+
+                fields:
+                  - address: 7500
+                    name: "warmwasser_solltemperatur_c"
+                    type: "INT16"
+                    scale: 0.1
+
+                  - address: 7501
+                    name: "warmwasser_betriebsart"
+                    type: "INT16"
+
+                  - address: 7502
+                    name: "warmwasser_nachladetemperatur_c"
+                    type: "INT16"
+                    scale: 0.1
+
+
+      outputs:
+        - prometheus_client:
+            listen: ":9273"
+            path: "/metrics"
+            expiration_interval: "30s"
+
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 100m
+      limits:
+        memory: 512Mi
+        cpu: 200m
+
+    pdb:
+      create: false

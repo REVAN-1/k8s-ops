@@ -1,0 +1,16 @@
+audiobookshelf
+crafty
+grafana
+immich
+jellyfin
+jellyseerr
+kavita
+lidarr
+nextcloud-config
+nextcloud-data
+paperless
+pinchflat
+radarr
+sabnzbd
+sonarr
+vaultwarden

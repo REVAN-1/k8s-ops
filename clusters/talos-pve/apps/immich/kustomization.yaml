@@ -7,3 +7,5 @@ resources:
   - db.yaml
   - helmrelease.yaml
   - backup.yaml
+  - dragonflydb.yaml
+  - image-policies.yaml

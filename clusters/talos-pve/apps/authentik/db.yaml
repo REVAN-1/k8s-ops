@@ -37,7 +37,11 @@ spec:
       secret:
         name: authentik-db-secret
   storage:
-    size: 4Gi
+    size: 8Gi
+    storageClass: csi-rbd-sc
+
+  walStorage:
+    size: 16Gi
     storageClass: csi-rbd-sc
 
   plugins:

@@ -13,26 +13,23 @@ spec:
     cleanupOnFail: true
     remediation:
       retries: 3
-      remediateLastFailure: true 
+      remediateLastFailure: true
   chart:
     spec:
       chart: vaultwarden
       sourceRef:
         kind: HelmRepository
-        name:  vaultwarden
+        name: vaultwarden
         namespace: flux-system
-      version: "0.43.1"
+      version: "0.46.2"
   valuesFrom:
     - kind: Secret
       name: vaultwarden-secrets
       valuesKey: values.yaml
   values:
-
     image:
-      tag: "1.36.0-alpine"
-
+      tag: "1.37.3" # {"$imagepolicy": "flux-system:vaultwarden:tag"}
     resourceType: "Deployment"
-
     storage:
       data:
         name: "vaultwarden-data"
@@ -41,7 +38,6 @@ spec:
         path: "/data"
         accessMode: "ReadWriteMany"
         keepPvc: true
-
     database:
       type: "postgresql"
       host: "vaultwarden-db-rw"
@@ -50,9 +46,7 @@ spec:
       existingSecret: vaultwarden-db-secret
       existingSecretUserKey: username
       existingSecretPasswordKey: password
-
     domain: "https://bitwarden.exmaple.com"
-
     smtp:
       host: "mail.exmaple.com"
       security: "force_tls"
@@ -60,17 +54,15 @@ spec:
       from: "bitwarden@exmaple.com"
       authMechanism: "Login"
       debug: false
-
     adminToken:
       existingSecret: "vaultwarden-disable-admin"
       existingSecretKey: "token"
-
     replicas: 1
     service:
       sessionAffinity: ClientIP
       sessionAffinityConfig:
         clientIP:
-          timeoutSeconds: 10800    
+          timeoutSeconds: 10800
     affinity:
       podAntiAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
@@ -79,19 +71,16 @@ spec:
                 app.kubernetes.io/name: vaultwarden
                 app.kubernetes.io/instance: vaultwarden
             topologyKey: kubernetes.io/hostname
-
     ingress:
       enabled: true
       class: "cilium"
-      nginxIngressAnnotations: true
+      nginxIngressAnnotations: false
       additionalAnnotations: {}
       labels: {}
       tls: true
       tlsSecret: "external-tls"
       hostname: "bitwarden.exmaple.com"
-
     timeZone: "Europe/Berlin"
-
     podSecurityContext:
       runAsNonRoot: true
       runAsUser: 1000
@@ -100,14 +89,12 @@ spec:
       fsGroupChangePolicy: OnRootMismatch
       seccompProfile:
         type: RuntimeDefault
-
     securityContext:
       allowPrivilegeEscalation: false
       readOnlyRootFilesystem: false
       capabilities:
         drop:
           - ALL
-
     resources:
       requests:
         cpu: 50m

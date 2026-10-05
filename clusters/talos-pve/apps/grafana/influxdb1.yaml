@@ -23,6 +23,13 @@ spec:
         namespace: flux-system
       version: "4.12.5"
   values:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi
     persistence:
       enabled: true
       storageClass: "csi-rbd-sc"
@@ -40,4 +47,12 @@ spec:
     env:
       - name: INFLUXDB_DB
         value: "evcc"
-
+    backup:
+      enabled: true
+      persistence:
+        enabled: false
+      schedule: "0 9 * * *"
+      s3:
+        credentialsSecret: s3-influx-credentials
+        destination: s3://influxdb/evcc
+        endpointUrl: "https://s3.int.exmaple.com"

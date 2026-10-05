@@ -13,7 +13,7 @@ spec:
     cleanupOnFail: true
     remediation:
       retries: 3
-      remediateLastFailure: true 
+      remediateLastFailure: true
   chart:
     spec:
       chart: app-template
@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       jellyseerr:
@@ -36,10 +36,10 @@ spec:
             fsGroup: 1000
             fsGroupChangePolicy: OnRootMismatch
         containers:
-          app: 
+          app:
             image:
               repository: ghcr.io/seerr-team/seerr
-              tag: "v3.3"
+              tag: "v3.5.0"  # {"$imagepolicy": "flux-system:seerr:tag"}
             env:
               TZ: Europe/Berlin
             resources:
@@ -58,23 +58,19 @@ spec:
               capabilities:
                 drop:
                   - ALL
-
-
     service:
       app:
         controller: jellyseerr
         ports:
           http:
             port: 5055
-
     persistence:
       config:
         existingClaim: jellyseerr-config
         advancedMounts:
           jellyseerr:
             app:
-              - path: /app/config            
-
+              - path: /app/config
     ingress:
       app:
         className: "cilium"
@@ -102,4 +98,4 @@ spec:
   storageClassName: csi-rbd-sc
   resources:
     requests:
-      storage: 100Mi 
+      storage: 100Mi

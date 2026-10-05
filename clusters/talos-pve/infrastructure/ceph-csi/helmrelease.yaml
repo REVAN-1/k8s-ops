@@ -1,0 +1,95 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ceph-csi-operator
+  namespace: ceph-csi-operator-system
+spec:
+  interval: 10m
+  install:
+    createNamespace: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  chart:
+    spec:
+      chart: ceph-csi-operator
+      sourceRef:
+        kind: HelmRepository
+        name: ceph-csi-operator
+        namespace: flux-system
+      version: "1.1.0"
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ceph-csi-drivers
+  namespace: ceph-csi-operator-system
+spec:
+  interval: 10m
+  dependsOn:
+    - name: ceph-csi-operator
+      namespace: ceph-csi-operator-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+  chart:
+    spec:
+      chart: ceph-csi-drivers
+      sourceRef:
+        kind: HelmRepository
+        name: ceph-csi-operator
+        namespace: flux-system
+      version: "1.1.0"
+  values:
+    cephConnections:
+      - name: talos-ceph
+        monitors:
+          - "10.50.0.21:3300"
+          - "10.50.0.22:3300"
+          - "10.50.0.23:3300"
+        rbdMirrorDaemonCount: 1
+        crushLocationLabels: []
+
+    clientProfiles: []
+
+    operatorConfig:
+      create: true
+      name: ceph-csi-operator-config
+      namespace: ceph-csi-operator-system
+      driverSpecDefaults:
+        controllerPlugin:
+          replicas: 3
+
+    drivers:
+      rbd:
+        enabled: true
+        name: rbd.csi.ceph.com
+        snapshotPolicy: none
+        controllerPlugin:
+          replicas: 3
+
+      cephfs:
+        enabled: true
+        name: cephfs.csi.ceph.com
+        cephFsClientType: kernel
+        snapshotPolicy: none
+        controllerPlugin:
+          replicas: 3
+
+      nfs:
+        enabled: false
+
+      nvmeof:
+        enabled: false

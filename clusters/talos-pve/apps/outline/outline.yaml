@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   valuesFrom:
     - kind: Secret
       name: outline-secrets
@@ -58,12 +58,26 @@ spec:
               OIDC_USERNAME_CLAIM: preferred_username
               OIDC_DISPLAY_NAME: OpenID Connect
               OIDC_SCOPES: "openid profile email"
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                cpu: 1
+                memory: 512Mi
       valkey:
         containers:
           valkey:
             image:
               repository: valkey/valkey
-              tag: "9-alpine@sha256:a35428eba9043cc0b79dbe54100f0c92784f2de00ad09b01182bfb1c5c83d1bd"       
+              tag: "9-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11"       
+            resources:
+              requests:
+                cpu: 25m
+                memory: 32Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
 
     service:
       app:

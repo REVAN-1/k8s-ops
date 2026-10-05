@@ -18,13 +18,16 @@ spec:
         runAsGroup: 1000
       containers:
       - name: mktxp-exporter
-        image: ghcr.io/akpw/mktxp:1.2.18@sha256:96dead6682c59d2c942c4a54d3ad12aef2811672971fec01df7462b60efea1cb
+        image: ghcr.io/akpw/mktxp:2.0.3@sha256:bfae76fbae8f9cab695cadd059b4f32b03573b6517432d08616ba3b1dc8936bc
         command: ["mktxp"]
         args:
           - --cfg-dir
           - /mktxp_config
           - export
         resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
           limits:
             memory: "512Mi"
             cpu: "500m"

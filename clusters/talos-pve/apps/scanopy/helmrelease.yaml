@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       scanopy:
@@ -30,13 +30,20 @@ spec:
           scanopy:
             image:
               repository: ghcr.io/scanopy/scanopy/server
-              tag: "v0.17.2@sha256:bc18b1bc2f47ed9576fd8a5aad30881c0f0f91450fdf7a28112ce3734f1b5da5"
+              tag: "v0.17.20@sha256:3216ab8fc97d19dd06e87c83ec9b16e1263e6f85f5f116227e7dbae808d1f701"
             env:
               SCANOPY_WEB_EXTERNAL_PATH: /app/static
               SCANOPY_PUBLIC_URL: https://scanopy.k8s.exmaple.com
             envFrom:
               - secretRef:
                   name: scanopy-env
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                cpu: 250m
+                memory: 256Mi
 
     service:
       scanopy:

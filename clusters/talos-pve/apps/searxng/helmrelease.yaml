@@ -1,0 +1,356 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: searxng
+  namespace: searxng
+spec:
+  interval: 10m
+
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      remediateLastFailure: true
+
+  chart:
+    spec:
+      chart: app-template
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      version: "5.2.1"
+
+  values:
+    defaultPodOptions:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+
+    controllers:
+      searxng:
+        strategy: Recreate
+        replicas: 1
+
+        annotations:
+          reloader.stakater.com/auto: "false"
+
+        containers:
+          app:
+            image:
+              repository: ghcr.io/searxng/searxng
+              tag: "2026.9.11-61d660276@sha256:a93b665d10ce0675e8d2124187943111399ba69f384228c51b4cd21fdceda0bc"
+
+            env:
+              TZ: Europe/Berlin
+
+              SEARXNG_SETTINGS_PATH: /etc/searxng/settings.yml
+              SEARXNG_BASE_URL: https://search.k8s.exmaple.com/
+              SEARXNG_PORT: "8080"
+
+              SEARXNG_VALKEY_URL: valkey://127.0.0.1:6379/0
+
+              FORCE_OWNERSHIP: "false"
+
+            envFrom:
+              - secretRef:
+                  name: searxng-secret
+
+            probes:
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /healthz
+                    port: 8080
+                  periodSeconds: 5
+                  timeoutSeconds: 3
+                  failureThreshold: 30
+
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /healthz
+                    port: 8080
+                  periodSeconds: 10
+                  timeoutSeconds: 3
+                  failureThreshold: 3
+
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /healthz
+                    port: 8080
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 3
+
+            securityContext:
+              allowPrivilegeEscalation: false
+
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
+
+          valkey:
+            image:
+              repository: ghcr.io/valkey-io/valkey
+              tag: "9.1.2-alpine3.24@sha256:3b83b0b6a598bb390c8186a408a69949772f439548a81c5ea0ab7ccf102c248d"
+
+            args:
+              - --bind
+              - "127.0.0.1"
+              - --protected-mode
+              - "yes"
+
+              - --save
+              - ""
+              - --appendonly
+              - "no"
+
+              - --loglevel
+              - warning
+
+              - --maxmemory
+              - 64mb
+
+              - --maxmemory-policy
+              - allkeys-lru
+
+            probes:
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command:
+                      - valkey-cli
+                      - -h
+                      - "127.0.0.1"
+                      - ping
+                  periodSeconds: 5
+                  timeoutSeconds: 3
+                  failureThreshold: 20
+
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command:
+                      - valkey-cli
+                      - -h
+                      - "127.0.0.1"
+                      - ping
+                  periodSeconds: 30
+                  timeoutSeconds: 3
+                  failureThreshold: 3
+
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 999
+              runAsGroup: 1000
+
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+
+              capabilities:
+                drop:
+                  - ALL
+
+            resources:
+              requests:
+                cpu: 25m
+                memory: 32Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
+          gluetun:
+            image:
+              repository: ghcr.io/qdm12/gluetun
+              tag: v3.41
+            env:
+              VPN_SERVICE_PROVIDER: custom
+              VPN_TYPE: wireguard
+              VPN_INTERFACE: wg0
+              VPN_ENDPOINT_PORT: 51820
+              VPN_PORT_FORWARDING: off
+              WIREGUARD_MTU: 1280
+              HEALTH_ICMP_TARGET_IPS: "9.9.9.9"
+              DOT: off
+              FIREWALL_INPUT_PORTS: 8080
+              FIREWALL_OUTBOUND_SUBNETS: 10.10.10.0/24,10.50.0.0/23,10.244.0.0/16,192.168.178.0/24
+              WIREGUARD_PERSISTENT_KEEPALIVE_INTERVAL: 25s
+              HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE: '{"auth":"none"}'
+            envFrom:
+              - secretRef:
+                  name: searxng-secret
+            probes:
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command: ["/gluetun-entrypoint", "healthcheck"]
+                  periodSeconds: 10
+                  failureThreshold: 30
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  exec:
+                    command: ["/gluetun-entrypoint", "healthcheck"]
+                  periodSeconds: 30
+                  timeoutSeconds: 10
+                  failureThreshold: 3
+            securityContext:
+              capabilities:
+                add:
+                  - NET_ADMIN
+              allowPrivilegeEscalation: false
+            resources:
+              requests:
+                cpu: 100m
+              limits:
+                cpu: 200m
+                memory: 512Mi
+
+
+    service:
+      app:
+        controller: searxng
+        type: ClusterIP
+
+        ports:
+          http:
+            port: 80
+            targetPort: 8080
+            protocol: HTTP
+
+
+    ingress:
+      app:
+        enabled: true
+        className: cilium
+
+        hosts:
+          - host: search.k8s.exmaple.com
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: http
+
+        tls:
+          - hosts:
+              - search.k8s.exmaple.com
+
+
+    configMaps:
+      config:
+        data:
+          settings.yml: |-
+            use_default_settings: true
+
+            general:
+              debug: false
+              instance_name: "SearXNG"
+
+              # Keine internen Statistiken sammeln.
+              enable_metrics: false
+
+              privacypolicy_url: false
+              donation_url: false
+              contact_url: false
+
+            search:
+              autocomplete: ""
+              favicon_resolver: ""
+              formats:
+                - html
+
+              safe_search: 0
+
+            server:
+              secret_key: "__provided_via_environment__"
+              public_instance: false
+              limiter: true
+              image_proxy: true
+              method: POST
+
+              default_http_headers:
+                X-Content-Type-Options: nosniff
+                X-Download-Options: noopen
+                X-Robots-Tag: noindex, nofollow
+                Referrer-Policy: no-referrer
+                Permissions-Policy: >-
+                  camera=(),
+                  microphone=(),
+                  geolocation=()
+
+            ui:
+              query_in_title: false
+
+            preferences:
+              lock:
+                - autocomplete
+                - favicon_resolver
+                - image_proxy
+                - method
+                - query_in_title
+
+            valkey:
+              url: valkey://127.0.0.1:6379/0
+
+            outgoing:
+              request_timeout: 3.0
+              max_request_timeout: 10.0
+              enable_http2: true
+              useragent_suffix: ""
+
+    persistence:
+      config:
+        type: configMap
+        identifier: config
+        advancedMounts:
+          searxng:
+            app:
+              - path: /etc/searxng/settings.yml
+                subPath: settings.yml
+                readOnly: true
+      cache:
+        type: emptyDir
+        advancedMounts:
+          searxng:
+            app:
+              - path: /var/cache/searxng
+      tmp:
+        type: emptyDir
+        advancedMounts:
+          searxng:
+            app:
+              - path: /tmp
+      valkey-data:
+        type: emptyDir
+        advancedMounts:
+          searxng:
+            valkey:
+              - path: /data

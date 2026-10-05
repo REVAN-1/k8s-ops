@@ -4,3 +4,4 @@ resources:
   - namespace.yaml
   - helmrelease.yaml
   - network-policies.yaml
+  - image-policies.yaml

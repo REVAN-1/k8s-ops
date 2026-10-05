@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       vymanager-frontend:
@@ -45,6 +45,13 @@ spec:
             envFrom:
               - secretRef:
                   name: vymanager-env
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                cpu: 250m
+                memory: 512Mi
 
       vymanager-backend:
         containers:
@@ -63,6 +70,13 @@ spec:
             envFrom:
               - secretRef:
                   name: vymanager-env
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
 
     service:
       vymanager-frontend:

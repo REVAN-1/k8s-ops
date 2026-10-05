@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: volsync-observer
+  namespace: woodpecker
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: volsync-observer
+rules:
+  - apiGroups:
+      - volsync.backube
+    resources:
+      - replicationsources
+    verbs:
+      - get
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: volsync-observer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: volsync-observer
+subjects:
+  - kind: ServiceAccount
+    name: volsync-observer
+    namespace: woodpecker
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cnpg-backup-observer
+  namespace: woodpecker
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cnpg-backup-observer
+rules:
+  - apiGroups:
+      - postgresql.cnpg.io
+    resources:
+      - clusters
+      - backups
+    verbs:
+      - get
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cnpg-backup-observer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cnpg-backup-observer
+subjects:
+  - kind: ServiceAccount
+    name: cnpg-backup-observer
+    namespace: woodpecker

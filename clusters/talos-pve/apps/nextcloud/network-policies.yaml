@@ -27,14 +27,14 @@ spec:
             - port: "5432"
               protocol: TCP
 
-    - toEndpoints:
-        - matchLabels:
-            app.kubernetes.io/name: redis
-            app.kubernetes.io/instance: nextcloud
+    - toServices:
+        - k8sService:
+            serviceName: nextcloud-session-cache
+            namespace: nextcloud
       toPorts:
         - ports:
             - port: "6379"
-              protocol: TCP            
+              protocol: TCP   
 
     - toEndpoints:
         - matchLabels:

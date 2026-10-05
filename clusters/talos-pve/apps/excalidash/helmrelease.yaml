@@ -21,7 +21,7 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       excalidash-backend:
@@ -32,7 +32,7 @@ spec:
           excalidash-backend:
             image:
               repository: zimengxiong/excalidash-backend
-              tag: "0.5.1@sha256:f37cd418bcad543add138c16cdb5e6301c3065b77344125458ab462adde99f15"
+              tag: "0.6.3@sha256:4cdb4136218029125688d194ed64130f27b80483247a740f5145b6f461240123"
             env:
               DATABASE_URL: "file:/app/prisma/dev.db"
               PORT: "8000"
@@ -47,6 +47,13 @@ spec:
             envFrom:
               - secretRef:
                   name: excalidash-env
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi
       excalidash-frontend:
         strategy: Recreate
         annotations:
@@ -55,9 +62,16 @@ spec:
           excalidash-frontend:
             image:
               repository: zimengxiong/excalidash-frontend
-              tag: "0.5.1@sha256:de12bee592b2db0bcdee1b7066283297696a3e9e3a309798f78ca6c9d6caff9c"
+              tag: "0.6.5@sha256:333a3f24bd599f69ebb3494e0393b6882f2f031fc0f05d02b0ede53ce7a743e0"
             env:
               BACKEND_URL: "excalidash-backend:8000"
+            resources:
+              requests:
+                cpu: 25m
+                memory: 32Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
 
     service:
       excalidash-backend:

@@ -21,78 +21,40 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       sabnzbd:
         strategy: Recreate
         annotations:
           reloader.stakater.com/auto: "false"
+        pod:
+          securityContext:
+            fsGroup: 0
+            fsGroupChangePolicy: OnRootMismatch
         containers:
           app: 
             image:
               repository: lscr.io/linuxserver/sabnzbd
-              tag: 5.0.4@sha256:30cc2eb9e1c8b7c5bb90dbf3c7abb0e66643c21c3710e273a82d2f36239e176d
+              tag: 5.1.3@sha256:793828eab1722556131d37187115a9d3e3b9703e03a55731a07f2e0fe4edc2c7
               pullPolicy: Always
             env:
               TZ: Europe/Berlin
+              PUID: 0
+              PGID: 0
+              UMASK: "002"
             resources:
               requests:
                 cpu: "250m"     
                 memory: "128Mi"  
               limits:
                 cpu: "1"     
-                memory: "2048Mi"  
-          gluetun:
-            image:
-              repository: ghcr.io/qdm12/gluetun
-              tag: v3.41
-            env:
-              VPN_SERVICE_PROVIDER: custom
-              VPN_TYPE: wireguard
-              VPN_INTERFACE: wg0
-              VPN_ENDPOINT_PORT: 51820
-              VPN_PORT_FORWARDING: off
-              VPN_PORT_FORWARDING_PROVIDER: protonvpn
-              WIREGUARD_MTU: 1280
-              HEALTH_ICMP_TARGET_IPS: "1.1.1.1"
-              DOT: off
-              FIREWALL_INPUT_PORTS: 8080
-              FIREWALL_OUTBOUND_SUBNETS: 10.10.10.0/24,10.50.0.0/23,10.244.0.0/16,192.168.178.0/24
-              WIREGUARD_PERSISTENT_KEEPALIVE_INTERVAL: 25s
-            envFrom:
-              - secretRef:
-                  name: sabnzb-secret
-            probes:
-              startup:
-                enabled: true
-                custom: true
-                spec:
-                  exec:
-                    command: ["/gluetun-entrypoint", "healthcheck"]
-                  periodSeconds: 10
-                  failureThreshold: 30
-              liveness:
-                enabled: true
-                custom: true
-                spec:
-                  exec:
-                    command: ["/gluetun-entrypoint", "healthcheck"]
-                  periodSeconds: 30
-                  timeoutSeconds: 10
-                  failureThreshold: 3
+                memory: "1250Mi"  
             securityContext:
-              capabilities:
-                add:
-                  - NET_ADMIN
               allowPrivilegeEscalation: false
-            resources:
-              requests:
-                cpu: 100m
-              limits:
-                cpu: 200m
-                memory: 512Mi
-
+              readOnlyRootFilesystem: false
+              seccompProfile:
+                type: RuntimeDefault
 
     service:
       app:

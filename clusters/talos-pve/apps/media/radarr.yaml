@@ -21,13 +21,17 @@ spec:
         kind: HelmRepository
         name: bjw-s
         namespace: flux-system
-      version: "5.0.1"
+      version: "5.2.1"
   values:
     controllers:
       radarr:
         strategy: Recreate
         annotations:
           reloader.stakater.com/auto: "false"
+        pod:
+          securityContext:
+            fsGroup: 0
+            fsGroupChangePolicy: OnRootMismatch
         containers:
           app: 
             image:
@@ -36,7 +40,20 @@ spec:
             env:
               TZ: Europe/Berlin
               PUID: 0
-              GUID: 0
+              PGID: 0
+            securityContext:
+              runAsNonRoot: false
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: false
+              seccompProfile:
+                type: RuntimeDefault
+            resources:
+              requests:
+                cpu: 250m
+                memory: 256Mi
+              limits:
+                cpu: 1
+                memory: 512Mi
 
     service:
       app:

@@ -18,7 +18,7 @@ spec:
   chart:
     spec:
       chart: vikunja
-      version: "v2.0.2"
+      version: "2.3.0"
       sourceRef:
         kind: HelmRepository
         name: vikunja
@@ -31,10 +31,8 @@ spec:
     vikunja:
       image:
         repository: vikunja/vikunja       
-        tag: "latest" 
+        tag: "unstable@sha256:4175f216be1d39f4f19189a5a1db933e7cb72cefe26b572b9b8bd42697cab532"
       persistence:
-        # This is where your Vikunja data lives,
-        # provide an existing PVC or let one be autocreated
         data:
           enabled: true
           accessMode: ReadWriteOnce
@@ -66,3 +64,10 @@ spec:
         VIKUNJA_DATABASE_TYPE: "postgres"
         VIKUNJA_DATABASE_USER: "vikunja"
         VIKUNJA_DATABASE_DATABASE: "vikunja"
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 250m
+          memory: 256Mi
